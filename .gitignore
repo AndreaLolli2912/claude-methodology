@@ -1,0 +1,2 @@
+# backups created by install.ps1 (these live in ~/.claude, not here, but ignore just in case)
+*.bak
