@@ -1,2 +1,7 @@
-# backups created by install.ps1 (these live in ~/.claude, not here, but ignore just in case)
+# backups created by `sync.py install` (these live in ~/.claude, not here, but ignore just in case)
 *.bak
+
+# project-level CLAUDE.md is local-only (repo-navigation context, not part of the shipped
+# bundle) — see docs/DECISIONS.md 2026-07-05. Not the bundled claude/CLAUDE.md.
+/CLAUDE.md
+docs/

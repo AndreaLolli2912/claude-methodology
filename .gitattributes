@@ -1,0 +1,4 @@
+# Force LF endings on the sync script. It carries a `#!/usr/bin/env python3` shebang, and a
+# stray CRLF would make Linux/macOS fail to launch `./sync.py` ("bad interpreter: python3\r").
+# Editing on Windows won't reintroduce CRLF because of this rule.
+*.py text eol=lf
