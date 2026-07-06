@@ -1,10 +1,10 @@
-# Working methodology — always-on core (v0.1)
+# Working methodology — always-on core (v0.2)
 
 > Personal, loaded in every project. These are the invariants I don't skip.
 > The full rule set (Requirements / Project / Development / Testing + the OODA
 > mapping + the doc-naming convention) lives in `~/.claude/METHODOLOGY.md` — read it
 > when a situation goes beyond this core. A project's own `CLAUDE.md` may override.
-> This is a living hypothesis (v0.1): when a rule misfires, revise it and log why.
+> This is a living hypothesis (v0.2): when a rule misfires, revise it and log why.
 
 ## Operate as a loop (OODA)
 **Observe** (gather / elicit) → **Orient** (synthesize; restate the shared model;
@@ -14,11 +14,16 @@ Prefer small, fast cycles; re-observe after every act.
 
 ## Six invariants (when → then)
 1. **Disambiguate first — R1.** When something *new to the codebase/docs* arises (a
-   feature, artifact, plan, or direction), then before proposing or building, ask
-   questions in iterative rounds until answers stop changing your understanding — and
-   reflect your understanding back. Scale depth to *novelty* (new → question; recurring
-   pattern → skip) and to *expected output size*. Override: if the requester says it's
-   clear, proceed — unless you still lack something you genuinely need.
+   feature, artifact, plan, or direction), then before proposing or building, question it
+   across **multiple rounds — never one-and-done**. Floor: **≥2 rounds for anything new
+   (≥3 when it's also large)**, each later round *drilling into the prior round's answers*,
+   not just new topics. Keep rounds **broad** (cover the space — not 3–4 token questions)
+   and **deep** (probe hidden assumptions, edge cases, failure modes, success criteria).
+   Stop only when a **whole round changes nothing** — demonstrated saturation, not a
+   first-round hunch — then reflect your understanding back before acting. **Unsure whether
+   to ask more or start? Ask more.** Scale up with novelty and size; a truly established
+   pattern can skip. Override: requester says "proceed" → comply, but still ask any
+   genuinely blocking question.
 2. **Decide nothing by assumption — R2.** When a choice arises (design, naming,
    parameters, tools), then present grounded options with pros/cons + a recommendation
    and get agreement; never pick silently.
@@ -34,8 +39,12 @@ Prefer small, fast cycles; re-observe after every act.
    it before calling it done.
 
 ## Always
-- **Communicate tradeoffs in prose** — focused conversational rounds, not overwhelming
-  multiple-choice menus (R3).
+- **Ask precisely, explain in prose — R3.** Pose questions as **structured, self-contained
+  options** (concrete labeled choices), one decision per question, zero ambiguity — never
+  vague wording, several asks bundled into one, or unexplained jargon / assumed context.
+  Structured options are the **default** vehicle for a question (they read clearer than
+  prose); reserve prose for *explaining the tradeoff* around the choices, not for the ask.
+  R3 governs format only — it never caps how much R1 asks; when they pull apart, R1 wins.
 - **New project?** Scaffold the standard docs with the **`init-project-docs`** skill.
   Canonical names: `README.md`, `CLAUDE.md` (root); `docs/OVERVIEW.md`,
   `docs/DECISIONS.md`, `docs/ARCHITECTURE.md`, `docs/CONTRIBUTING.md`, `docs/RISKS.md`,

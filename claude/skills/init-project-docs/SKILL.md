@@ -1,7 +1,7 @@
 ---
 name: init-project-docs
 description: Scaffold the standard project documentation set (OVERVIEW, DECISIONS, ARCHITECTURE, CONTRIBUTING, RISKS, PLAYBOOK, README) and wire the repo to the personal working methodology. Use when starting a new project, when the user asks to "set up docs", "scaffold docs", or "init project docs", or when a repo is missing the standard documentation files.
-version: 0.1.0
+version: 0.2.0
 tools: Read, Write, Edit, Glob
 ---
 
@@ -17,15 +17,18 @@ Starting a new project, or an existing repo lacks the standard docs. Safe to re-
 never overwrites an existing file — it only creates what's missing and reports the rest.
 
 ## Before scaffolding (methodology R1 — disambiguate first)
-Ask the user one short round of questions to fill the docs meaningfully — only what's
-needed, in prose (methodology R3), not a menu:
+Question the user across **at least two rounds** (R1's floor for new work) before
+scaffolding, the second round drilling into the first's answers, so the docs are filled
+meaningfully. Pose them as **structured, concrete options** (methodology R3), one decision
+per question, zero ambiguity — never vague prose. Round one covers the essentials:
 - What is this project (one sentence), and who is it for?
 - What stage is it at (idea / prototype / in production)?
 - The main components or subsystems, if known.
 - Hard constraints (platform, budget, offline, performance, deadlines).
 
-If the user says to proceed without answering, create the files with clearly-marked
-`TODO` placeholders instead. Do not block beyond one round.
+Then drill into whatever those answers leave ambiguous. Stop when a full round changes
+nothing. If the user says to proceed without answering, create the files with
+clearly-marked `TODO` placeholders instead.
 
 ## Steps
 1. **Detect.** Glob the repo root and `docs/` for existing standard files; list what's

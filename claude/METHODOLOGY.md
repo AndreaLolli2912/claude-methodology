@@ -6,9 +6,9 @@
 > as a living document: when a rule proves wrong or missing in real use, revise it here
 > and record why in the project's decision log.
 >
-> **Version 0.1** (2026-07-02). Deployed as: lean core → `~/.claude/CLAUDE.md`; this
+> **Version 0.2** (2026-07-06). Deployed as: lean core → `~/.claude/CLAUDE.md`; this
 > reference → `~/.claude/METHODOLOGY.md`; doc scaffolding → the `init-project-docs` skill.
-> Enforcement hooks for P1/P2 are planned for v0.2 after real-project use.
+> Enforcement hooks for P1/P2 are planned for v0.3 after further real-project use.
 
 ## How to read this
 Two structures, on different axes:
@@ -35,18 +35,25 @@ act; a plan is a hypothesis, not a promise.
 ## 1. Requirements Analysis
 *Understanding and de-risking what to build, before building it.*
 
-- **R1 — Disambiguate first, scaled to novelty and size.** When anything new arises — a
-  feature, artifact, plan, or direction — the first action is to ask questions, not to
-  propose or build.
+- **R1 — Disambiguate first, in multiple rounds, scaled to novelty and size.** When
+  anything new arises — a feature, artifact, plan, or direction — the first action is to
+  ask questions, not to propose or build.
   - *Novelty is the gate:* if the idea or code is new to this codebase/document (nothing
     like it exists here), it must be questioned; a recurring, already-established pattern
     needs little or none.
   - *Volume is the amplifier:* the more output the work is expected to produce, the more
     thorough the questioning — deepest when the work is both new *and* large.
-  - *Ask iteratively:* each round, pose the questions that most reduce ambiguity; feed the
-    answers into the next round; continue until further questions stop changing your
-    understanding (saturation). Treat the opening description as incomplete, and reflect
-    your understanding back so wrong assumptions surface.
+  - *Question in rounds, with a floor — never one-and-done:* at least **two rounds for
+    anything new, three when it is also large**; each later round *drills into the previous
+    round's answers*, not just new topics. Stop only when a full round surfaces nothing
+    that changes your understanding (demonstrated saturation) — not a first-round hunch.
+    When unsure whether to ask again or start building, ask again: stopping is what needs
+    justifying.
+  - *Make each round broad and deep:* cover the space (enough questions, not three token
+    ones) and probe beneath the surface — hidden assumptions, edge cases, failure modes,
+    and what success looks like — not just the visible choices like scope and naming.
+  - *Reflect back:* treat the opening description as incomplete, and reflect your
+    understanding back so wrong assumptions surface before you act.
   - *Override (asymmetric):* the requester may declare the matter clear and say "proceed,"
     and you comply — unless you yourself still lack information you genuinely need to
     proceed correctly, in which case ask the blocking question(s) first. In short: clear
@@ -54,8 +61,16 @@ act; a plan is a hypothesis, not a promise.
 - **R2 — Decide nothing by assumption.** Once eliciting is done and a choice must be made
   (design, naming, parameters, tooling), present grounded options with pros/cons and a
   recommendation, then get agreement before proceeding. R1 gathers; R2 chooses.
-- **R3 — Communicate tradeoffs in prose.** Explain options and consequences as continuous,
-  conversational explanation — focused rounds — not overwhelming multiple-choice menus.
+- **R3 — Ask precisely and structurally; explain in prose.** Pose questions as structured,
+  self-contained options — concrete labeled choices, one decision per question, zero
+  ambiguity. The failure modes to avoid: vague wording (unclear what is being decided),
+  bundling several asks into one, and jargon or assumed context the reader may not have.
+  Structured options are the *default* vehicle for a question — they read clearer than a
+  prose paragraph, which is why the earlier "avoid menus" guidance is dropped (ambiguity,
+  not menus, was the problem). This is R2's grounded options, delivered as the question
+  itself. Use prose for what it is good at — *explaining the tradeoff and consequences*
+  around the choices — not for the ask. R3 governs format only; it never caps how much R1
+  requires you to ask, and when the two pull apart, R1 wins.
 - **R4 — Gate risky work behind a feasibility experiment.** A *feasibility experiment* is a
   small, throwaway trial built only to answer one risky question before you commit. When
   success depends on an unproven assumption — a speed/quality number, an unfamiliar tool, a
@@ -149,8 +164,16 @@ project keeps a local `docs/METHODOLOGY.md` only to pin a specific version.
 - Dated logs are newest-first; cross-link between docs instead of duplicating.
 
 ## Changelog
+- **v0.2 (2026-07-06)** — First experience-driven revision, after real use showed the Q&A
+  process under-asking. Strengthened **R1**: questioning is now multi-round with a floor
+  (≥2 rounds for new work, ≥3 when also large), each round drilling into the last, made
+  broad *and* deep (assumptions / edge cases / failure modes / success criteria), stopping
+  only at demonstrated saturation, and defaulting to *ask more* when unsure. Rewrote **R3**:
+  questions are posed as precise, structured, self-contained options — the "avoid menus"
+  guidance is dropped (ambiguity, not menus, was the problem) — with prose reserved for
+  explaining tradeoffs; R3 never caps how much R1 asks. The `init-project-docs` skill was
+  updated to match. Enforcement hooks deferred to v0.3.
 - **v0.1 (2026-07-02)** — Initial extraction from the voice-assistant-concierge project's
   conventions; generalized to be technology-agnostic; added R1 (disambiguate first) and the
   OODA operating loop; strengthened D2 to "comment everything (how + why)." Deployed as a
-  lean core + this reference + the `init-project-docs` skill. Enforcement hooks deferred to
-  v0.2.
+  lean core + this reference + the `init-project-docs` skill. Enforcement hooks deferred.
