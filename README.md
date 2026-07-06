@@ -38,3 +38,9 @@ The repo is the source of truth, so the round-trip is one script, two directions
   runs on any Python 3.
 - Use `python` or `python3` — whichever your machine has. `~/.claude` means
   `%USERPROFILE%\.claude` on Windows and `$HOME/.claude` on macOS/Linux.
+- **Windows: if `python` prints a Microsoft Store message** (or seems to do nothing), Python
+  isn't actually installed — that's the Store *alias stub*, not an interpreter, so
+  `python sync.py install` will fail. Install Python 3 from
+  [python.org](https://www.python.org/downloads/) (tick *"Add python.exe to PATH"*) or the
+  Microsoft Store, then verify with `python --version` (you want `Python 3.x`, not the Store
+  message) and re-run.
