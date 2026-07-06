@@ -55,7 +55,7 @@ revised and the reason logged — that's how this reached **v0.2**. The always-o
 - `claude/VERSION` — the machine-readable current version (single source of truth)
 - `claude/skills/init-project-docs/SKILL.md` — scaffolds a project's standard docs
 - `claude/hooks/check_version.py` — SessionStart hook that flags when a newer version exists
-- `sync.py` — one script: deploy into `~/.claude`, capture edits back, or check/enable the update hook
+- `sync.py` — one script: deploy/update `~/.claude`, capture edits back, or check/enable the update hook
 
 ## Install on a new machine
 1. Get this folder onto the machine — `git clone <your-repo-url>`, or copy it via any channel
@@ -90,8 +90,8 @@ python sync.py enable-hook      # add it     ·     python sync.py disable-hook 
 ```
 This adds a `SessionStart` hook to `~/.claude/settings.json` (your existing settings are backed
 up first and fully preserved). From then on, when you start a new Claude Code session and a
-newer version exists, you'll see a short notice of what changed — then you decide whether to
-`git pull` and `python sync.py install`.
+newer version exists, you'll see a short notice of what changed — then apply it in one step
+with `python sync.py update` (a `git pull --ff-only` followed by `install`).
 
 The check is deliberately unobtrusive: it runs at most **once a day** (cached in between), times
 out fast, stays **silent when you're up to date or offline**, and never blocks a session. It

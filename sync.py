@@ -6,6 +6,7 @@ anywhere Python 3 is present with nothing to install.
 
     python  sync.py install       # repo      -> ~/.claude   (backs up anything it replaces)
     python3 sync.py capture       # ~/.claude -> repo        (stage live edits for commit)
+    python  sync.py update        # git pull the latest, then install (one-command update)
     python  sync.py check         # is a newer methodology version published on GitHub?
     python  sync.py enable-hook   # notify at Claude Code startup when an update is available
     python  sync.py disable-hook  # remove that notification hook
@@ -23,6 +24,7 @@ import argparse
 import importlib.util
 import json
 import shutil
+import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -242,6 +244,50 @@ def disable_hook() -> None:
     print("  removed the SessionStart update-check hook.")
 
 
+def update() -> None:
+    """One-command update: `git pull` the repo, then `install` the refreshed files into ~/.claude.
+
+    This is the "apply" step that the update-check hook only *notifies* about. It works only from
+    a git checkout with a reachable remote — a USB/OneDrive copy has no `.git`, so we say so and
+    stop. We pull with `--ff-only` so it can only fast-forward: if local history has diverged (say
+    you made local commits), it fails cleanly instead of creating a surprise merge, and we do NOT
+    deploy a half-updated tree.
+    """
+    # A plain folder copy (no .git) can't pull — tell the user how to refresh it by hand.
+    if not (REPO_ROOT / ".git").exists():
+        print("  ! Not a git checkout, so there's nothing to pull.", file=sys.stderr)
+        print("    Refresh this folder yourself (git clone / re-download / re-copy), then run:")
+        print("      python sync.py install")
+        return
+
+    print("Pulling the latest methodology from the remote...")
+    try:
+        pull = subprocess.run(
+            ["git", "-C", str(REPO_ROOT), "pull", "--ff-only"],
+            capture_output=True, text=True,
+        )
+    except FileNotFoundError:                       # git isn't installed / not on PATH
+        print("  ! git was not found on PATH.", file=sys.stderr)
+        print("    Install git (or pull manually), then run:  python sync.py install")
+        return
+
+    # Echo git's own summary ("Already up to date." / "Fast-forward ...") so the user sees it.
+    if pull.stdout.strip():
+        print(pull.stdout.strip())
+    if pull.returncode != 0:
+        # Network down, diverged history, or local edits blocking the pull — do NOT deploy.
+        print("  ! git pull failed — not deploying anything.", file=sys.stderr)
+        detail = (pull.stderr or pull.stdout).strip()
+        if detail:
+            print("    " + detail.replace("\n", "\n    "), file=sys.stderr)
+        print("    Fix it (commit/stash local edits, or check your network), then retry.", file=sys.stderr)
+        return
+
+    # Pull succeeded (fast-forwarded or already current) -> deploy the now-current files.
+    print()
+    install()
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Deploy the working methodology to ~/.claude, or capture live edits back.",
@@ -249,6 +295,7 @@ def main(argv: list[str] | None = None) -> int:
     # dest="command" lets us tell "no subcommand" apart from a real one below.
     sub = parser.add_subparsers(dest="command")
     sub.add_parser("install", help="repo -> ~/.claude (backs up anything it replaces)")
+    sub.add_parser("update", help="git pull the latest, then install (one-command update)")
     sub.add_parser("capture", help="~/.claude -> repo (stage live edits for commit)")
     sub.add_parser("check", help="check GitHub for a newer methodology version (verbose)")
     sub.add_parser("enable-hook", help="notify at Claude Code startup when an update exists")
@@ -257,6 +304,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command == "install":
         install()
+    elif args.command == "update":
+        update()
     elif args.command == "capture":
         capture()
     elif args.command == "check":

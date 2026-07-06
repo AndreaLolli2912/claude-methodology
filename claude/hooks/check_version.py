@@ -223,7 +223,7 @@ def _run_check_inner(*, verbose: bool, use_throttle: bool) -> int:
         if update_available:
             _emit("\nAn update is available. What you'd gain:\n")
             _emit("\n".join(delta) if delta else "  (see CHANGELOG.md on GitHub)")
-            _emit("\nTo update: pull the claude-methodology repo, then  python sync.py install")
+            _emit("\nTo update in one step:  python sync.py update")
         else:
             _emit("\nYou're up to date.")
         return 2 if update_available else 0
@@ -244,7 +244,7 @@ def _format_hook_notice(installed: str, remote: str, delta: list[str]) -> str:
     lines.extend(bullets[:6])
     if len(bullets) > 6:
         lines.append("  … see CHANGELOG.md for the rest")
-    lines.append("Update:  pull the claude-methodology repo, then  python sync.py install  (restart Claude Code)")
+    lines.append("Update in one step:  python sync.py update   (then restart Claude Code)")
     return "\n".join(lines)
 
 

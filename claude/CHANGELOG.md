@@ -5,6 +5,11 @@
 > the human-readable changelog. Each release is one `## <semver> — <date>` heading followed
 > by `- ` bullet lines. Newest first. Keep the heading grammar stable — a parser binds to it.
 
+## 0.3.1 — 2026-07-06
+- Added `python sync.py update`: one command that runs `git pull --ff-only` then `install`, so a
+  notified update can be applied in a single step (the update-check hook only *notifies*).
+- The update notice (hook + `check`) now points at `sync.py update` instead of two manual steps.
+
 ## 0.3.0 — 2026-07-06
 - Added update notifications: an opt-in Claude Code SessionStart hook (`python sync.py
   enable-hook`) that checks GitHub for a newer methodology version and shows this changelog's
