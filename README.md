@@ -44,7 +44,7 @@ Concretely, that buys four things:
   to any work, so quality doesn't depend on how you felt that day.
 
 The rules are a *living hypothesis*, not dogma: when one misfires in real use it gets
-revised and the reason logged — that's how this reached **v0.2**. The always-on core is
+revised and the reason logged — that's how it keeps improving. The always-on core is
 `claude/CLAUDE.md`; the full Requirements / Project / Development / Testing rule set lives in
 `claude/METHODOLOGY.md`.
 
@@ -57,46 +57,40 @@ revised and the reason logged — that's how this reached **v0.2**. The always-o
 - `claude/hooks/check_version.py` — SessionStart hook that flags when a newer version exists
 - `sync.py` — one script: deploy/update `~/.claude`, capture edits back, or check/enable the update hook
 
-## Install on a new machine
-1. Get this folder onto the machine — `git clone <your-repo-url>`, or copy it via any channel
-   your IT allows (OneDrive / Google Drive / USB).
-2. In the folder, deploy the bundle into `~/.claude`:
-   - Windows: `python sync.py install`
-   - macOS / Linux: `python3 sync.py install`  (or `./sync.py install`)
+## Set it up — and keep it current — with one command
+Get this folder onto the machine (`git clone <your-repo-url>`, or copy it via any channel your
+IT allows — OneDrive / Google Drive / USB). Then, from inside the folder, run:
 
-   It backs up anything it replaces as `*.<timestamp>.bak`.
-3. Restart Claude Code. Check `/skills` lists `init-project-docs`.
+    python sync.py
 
-## Sync changes between machines
-The repo is the source of truth, so the round-trip is one script, two directions:
-- **Edited the live files in `~/.claude`?** Pull them back, then commit:
-  `python sync.py capture`  →  `git add -A; git commit -m "..."; git push`
-- **On another machine:** `git pull`, then `python sync.py install`.
+That's the everyday command. With **no subcommand** it brings `~/.claude` up to date: on a git
+clone it pulls the latest and installs it; on a plain copy it just installs what's here. It backs
+up anything it replaces as `*.<timestamp>.bak`. Restart Claude Code and check `/skills` lists
+`init-project-docs`. Run it again any time to update. (Use `python3` on macOS/Linux.)
 
-## Staying up to date
-`sync.py install` is a one-shot copy — it can't tell you when a *newer* methodology version is
-published later. If you don't Watch this repo on GitHub, two ways to find out:
+## Get told when there's an update (optional — set once)
 
-**On demand** — ask any time:
-```
-python sync.py check
-```
-It compares your installed `~/.claude/VERSION` against the version on GitHub and, if you're
-behind, prints the changelog of exactly what you'd gain.
+    python sync.py enable-hook
 
-**Automatically, inside Claude Code** (opt-in) — set it once:
-```
-python sync.py enable-hook      # add it     ·     python sync.py disable-hook   # remove it
-```
-This adds a `SessionStart` hook to `~/.claude/settings.json` (your existing settings are backed
-up first and fully preserved). From then on, when you start a new Claude Code session and a
-newer version exists, you'll see a short notice of what changed — then apply it in one step
-with `python sync.py update` (a `git pull --ff-only` followed by `install`).
+Adds a `SessionStart` hook so that, when you start a new Claude Code session and a newer version
+exists, you see a short notice of what changed — then run `python sync.py` to apply it. The check
+is unobtrusive: at most **once a day**, fast timeout, **silent when up to date or offline**, and
+never blocks a session. Turn it off with `python sync.py disable-hook` or by setting
+`METHODOLOGY_UPDATE_CHECK=0`.
 
-The check is deliberately unobtrusive: it runs at most **once a day** (cached in between), times
-out fast, stays **silent when you're up to date or offline**, and never blocks a session. It
-makes one HTTPS request to GitHub; to turn it off, run `disable-hook` or set the environment
-variable `METHODOLOGY_UPDATE_CHECK=0`.
+## The other commands (you rarely need these)
+| Command | What it does |
+|---|---|
+| `python sync.py` | **The everyday one** — update (git clone) or install (plain copy) |
+| `python sync.py update` | The explicit form: `git pull --ff-only`, then install |
+| `python sync.py install` | Deploy the files here into `~/.claude` (no pull) |
+| `python sync.py check` | Manually ask "is a newer version published?" (the hook already does this) |
+| `python sync.py enable-hook` · `disable-hook` | Turn the in-session update notice on / off |
+| `python sync.py capture` | Reverse direction — copy live `~/.claude` edits back into the repo, then `git commit` |
+
+**Editing the methodology yourself?** Change the files under `claude/`, run `python sync.py` to
+deploy, then commit + push. If you edited the live `~/.claude` files directly, pull them back
+first with `python sync.py capture`. Full guide: `docs/CONTRIBUTING.md`.
 
 ## Notes
 - `install` **overwrites** the bundled files in `~/.claude`, backing up any existing copy as

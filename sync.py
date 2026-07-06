@@ -4,12 +4,15 @@
 One cross-platform entry point (Windows + macOS/Linux), standard-library only, so it runs
 anywhere Python 3 is present with nothing to install.
 
-    python  sync.py install       # repo      -> ~/.claude   (backs up anything it replaces)
-    python3 sync.py capture       # ~/.claude -> repo        (stage live edits for commit)
-    python  sync.py update        # git pull the latest, then install (one-command update)
-    python  sync.py check         # is a newer methodology version published on GitHub?
-    python  sync.py enable-hook   # notify at Claude Code startup when an update is available
-    python  sync.py disable-hook  # remove that notification hook
+    python  sync.py               # THE everyday command: update — pull the latest, then install
+    python  sync.py enable-hook   # (once) get told at Claude Code startup when an update exists
+
+  Occasional / under the hood:
+    python  sync.py update        # explicit form of the no-arg command (git pull + install)
+    python  sync.py install       # deploy the files here into ~/.claude (no pull)
+    python3 sync.py capture       # ~/.claude -> repo (pull your live edits back to the repo)
+    python  sync.py check         # manual "is a newer version published?" (the hook does this)
+    python  sync.py disable-hook  # remove the notification hook
 
 The repo is the source of truth. `install` writes the live side; `capture` writes the repo
 side. There is no merge — each direction overwrites — but `install` keeps a timestamped
@@ -288,9 +291,25 @@ def update() -> None:
     install()
 
 
+def default_action() -> None:
+    """What `python sync.py` with NO subcommand does: bring this machine up to date.
+
+    This is the everyday command. On a git checkout it runs `update` (pull the latest, then
+    install); on a plain folder copy (no `.git`, so nothing to pull) it just `install`s what's
+    here. Everything else — capture, check, enable-hook, disable-hook — is a named subcommand.
+    """
+    print("No command given — bringing ~/.claude up to date (run  python sync.py -h  for the rest).\n")
+    if (REPO_ROOT / ".git").exists():
+        update()          # git checkout: pull the latest, then install
+    else:
+        install()         # plain copy: nothing to pull, just deploy what's here
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Deploy the working methodology to ~/.claude, or capture live edits back.",
+        description="Sync the working methodology with ~/.claude. Run with NO command to update "
+                    "(pull the latest, then install) — the everyday one. The subcommands below "
+                    "are for occasional cases.",
     )
     # dest="command" lets us tell "no subcommand" apart from a real one below.
     sub = parser.add_subparsers(dest="command")
@@ -315,9 +334,8 @@ def main(argv: list[str] | None = None) -> int:
     elif args.command == "disable-hook":
         disable_hook()
     else:
-        # No/unknown subcommand: show usage and exit non-zero so a caller can detect misuse.
-        parser.print_help(sys.stderr)
-        return 2
+        # No subcommand: run the everyday action (update on a git checkout, else install).
+        default_action()
     return 0
 
 

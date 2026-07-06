@@ -5,6 +5,12 @@
 > the human-readable changelog. Each release is one `## <semver> — <date>` heading followed
 > by `- ` bullet lines. Newest first. Keep the heading grammar stable — a parser binds to it.
 
+## 0.3.2 — 2026-07-06
+- `python sync.py` with **no subcommand** now does the everyday thing — update on a git checkout,
+  install on a plain copy — so there's one command to remember. The named subcommands are
+  unchanged and still available.
+- Reframed the README and docs around that single command.
+
 ## 0.3.1 — 2026-07-06
 - Added `python sync.py update`: one command that runs `git pull --ff-only` then `install`, so a
   notified update can be applied in a single step (the update-check hook only *notifies*).

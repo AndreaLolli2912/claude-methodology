@@ -6,7 +6,7 @@
 > as a living document: when a rule proves wrong or missing in real use, revise it here
 > and record why in the project's decision log.
 >
-> **Version 0.3.1** (2026-07-06). Deployed as: lean core → `~/.claude/CLAUDE.md`; this
+> **Version 0.3.2** (2026-07-06). Deployed as: lean core → `~/.claude/CLAUDE.md`; this
 > reference → `~/.claude/METHODOLOGY.md`; doc scaffolding → the `init-project-docs` skill;
 > version + changelog + update-check hook → `claude/VERSION`, `claude/CHANGELOG.md`,
 > `claude/hooks/check_version.py`. Enforcement hooks for P1/P2 (a *different* mechanism from
