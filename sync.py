@@ -4,8 +4,11 @@
 One cross-platform entry point (Windows + macOS/Linux), standard-library only, so it runs
 anywhere Python 3 is present with nothing to install.
 
-    python  sync.py install    # repo      -> ~/.claude   (backs up anything it replaces)
-    python3 sync.py capture    # ~/.claude -> repo        (stage live edits for commit)
+    python  sync.py install       # repo      -> ~/.claude   (backs up anything it replaces)
+    python3 sync.py capture       # ~/.claude -> repo        (stage live edits for commit)
+    python  sync.py check         # is a newer methodology version published on GitHub?
+    python  sync.py enable-hook   # notify at Claude Code startup when an update is available
+    python  sync.py disable-hook  # remove that notification hook
 
 The repo is the source of truth. `install` writes the live side; `capture` writes the repo
 side. There is no merge — each direction overwrites — but `install` keeps a timestamped
@@ -17,6 +20,8 @@ backup of whatever it replaced, so nothing is ever clobbered silently.
 from __future__ import annotations
 
 import argparse
+import importlib.util
+import json
 import shutil
 import sys
 from datetime import datetime
@@ -31,6 +36,9 @@ MANIFEST = [
     "CLAUDE.md",
     "METHODOLOGY.md",
     "skills/init-project-docs/SKILL.md",
+    "VERSION",                     # machine-readable current version (single source of truth)
+    "CHANGELOG.md",                # parseable release history; source of the update-notice delta
+    "hooks/check_version.py",      # deployed SessionStart hook that checks GitHub for updates
 ]
 
 # Anchor every path off this script's own folder so the repo can be moved or renamed without
@@ -40,6 +48,19 @@ BUNDLE_DIR = REPO_ROOT / "claude"             # the repo's mirror of ~/.claude
 # Path.home() resolves %USERPROFILE% on Windows and $HOME on macOS/Linux — this one line is
 # what makes the whole script cross-platform.
 TARGET_DIR = Path.home() / ".claude"          # this machine's live ~/.claude
+
+
+def _timestamped_backup(dst: Path) -> Path:
+    """Copy an existing file to `dst.<YYYYMMDD-HHMMSS>.bak` and return the backup path.
+
+    ONE backup convention shared by everything that overwrites a live file — the file installs
+    below and the settings.json hook merge further down — so a replaced file is always
+    recoverable. The caller guarantees `dst` already exists.
+    """
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    bak = dst.with_name(f"{dst.name}.{stamp}.bak")
+    shutil.copy2(dst, bak)
+    return bak
 
 
 def _copy(src: Path, dst: Path, *, backup: bool) -> bool:
@@ -55,9 +76,7 @@ def _copy(src: Path, dst: Path, *, backup: bool) -> bool:
         return False
     dst.parent.mkdir(parents=True, exist_ok=True)   # ensure the destination folder exists
     if backup and dst.exists():                     # never clobber silently: back up first
-        stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-        bak = dst.with_name(f"{dst.name}.{stamp}.bak")
-        shutil.copy2(dst, bak)
+        bak = _timestamped_backup(dst)
         print(f"  backed up {dst.name} -> {bak.name}")
     shutil.copy2(src, dst)                           # copy2 preserves mtime + permission bits
     return True
@@ -70,6 +89,7 @@ def install() -> None:
         if _copy(BUNDLE_DIR / rel, TARGET_DIR / rel, backup=True):
             print(f"  installed {rel}")
     print("\nDone. Restart Claude Code, then check /skills lists 'init-project-docs'.")
+    print("Tip: run  python sync.py enable-hook  for in-session update notifications.")
 
 
 def capture() -> None:
@@ -84,6 +104,144 @@ def capture() -> None:
     print("\nDone. Now:  git add -A;  git commit -m 'update methodology';  git push")
 
 
+# --- Update-check + SessionStart hook wiring ---------------------------------------------
+# The check LOGIC lives in the deployed hook script (claude/hooks/check_version.py), because
+# THAT file — not sync.py — is what ships into ~/.claude and runs as the hook. sync.py loads
+# that same module to power `sync.py check`, so there is exactly one copy of the logic (P4/P5).
+CHECK_SCRIPT_REL = "hooks/check_version.py"     # path inside the bundle AND inside ~/.claude
+SETTINGS_FILE = TARGET_DIR / "settings.json"    # Claude Code's user settings (personal file!)
+
+
+def _load_check_module():
+    """Import the bundle's check_version.py as a module so `check` reuses the hook's own logic."""
+    path = BUNDLE_DIR / CHECK_SCRIPT_REL
+    spec = importlib.util.spec_from_file_location("check_version", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)             # runs the file's top level, exposing run_check()
+    return module
+
+
+def check() -> None:
+    """Manually check whether a newer methodology version is published (verbose, no throttle)."""
+    _load_check_module().run_check(verbose=True, use_throttle=False)
+
+
+def _read_settings() -> dict:
+    """Load ~/.claude/settings.json as a dict; {} if it doesn't exist yet.
+
+    If the file exists but isn't valid JSON, json.loads raises — the caller catches that and
+    ABORTS WITHOUT WRITING, because we must never overwrite a personal settings file we could
+    not safely parse.
+    """
+    if not SETTINGS_FILE.exists():
+        return {}
+    return json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
+
+
+def _write_settings(settings: dict) -> None:
+    """Write settings.json back with 2-space indent + trailing newline (matching the live file)."""
+    SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    SETTINGS_FILE.write_text(json.dumps(settings, indent=2) + "\n", encoding="utf-8")
+
+
+def _hook_command() -> str:
+    """Build the hook command: THIS Python interpreter (absolute) + the deployed script (absolute).
+
+    We embed `sys.executable` rather than a bare `python`, because on some machines `python`
+    resolves to the Windows Store alias stub, not a real interpreter — a bare command would
+    silently never run (this repo's RISK #6, now reaching the hook). Both paths are quoted so a
+    space (e.g. "C:\\Program Files\\...") can't split the command.
+    """
+    script = TARGET_DIR / CHECK_SCRIPT_REL
+    return f'"{sys.executable}" "{script}"'
+
+
+def _hook_refers_to_check(command: str) -> bool:
+    """True if a hook command points at our check script — matched on IDENTITY, not exact string.
+
+    Matching the script path (not the whole command) means a re-run after the interpreter path
+    changed still finds and refreshes the existing entry instead of adding a duplicate. Windows
+    paths are case-insensitive and mix "/" and "\\", so we normalise both sides before comparing.
+    """
+    needle = CHECK_SCRIPT_REL.replace("/", "").replace("\\", "").lower()
+    haystack = command.replace("/", "").replace("\\", "").lower()
+    return needle in haystack
+
+
+def enable_hook() -> None:
+    """Register the SessionStart update-check hook in ~/.claude/settings.json (idempotent).
+
+    Backs the file up first, preserves every existing setting, and either refreshes our hook in
+    place (if already present) or appends it once — so re-running is always safe.
+    """
+    try:
+        settings = _read_settings()
+    except json.JSONDecodeError as exc:
+        print(f"  ! {SETTINGS_FILE} is not valid JSON ({exc}); refusing to touch it.", file=sys.stderr)
+        return
+    if SETTINGS_FILE.exists():
+        bak = _timestamped_backup(SETTINGS_FILE)
+        print(f"  backed up {SETTINGS_FILE.name} -> {bak.name}")
+
+    command = _hook_command()
+    session_start = settings.setdefault("hooks", {}).setdefault("SessionStart", [])
+
+    # If a group already runs our script, refresh that command in place (don't duplicate).
+    for group in session_start:
+        for entry in group.get("hooks", []):
+            if entry.get("type") == "command" and _hook_refers_to_check(entry.get("command", "")):
+                entry["command"] = command
+                _write_settings(settings)
+                print("  refreshed the existing SessionStart update-check hook.")
+                return
+
+    # Not present yet — append one matcher group. "startup" fires only on fresh sessions (not
+    # resume/compact), and a short timeout keeps a slow network from delaying session start.
+    session_start.append({
+        "matcher": "startup",
+        "hooks": [{"type": "command", "command": command, "timeout": 10}],
+    })
+    _write_settings(settings)
+    print("  enabled the SessionStart update-check hook.")
+    print("  new Claude Code sessions will now flag when a newer methodology is published.")
+
+
+def disable_hook() -> None:
+    """Remove the SessionStart update-check hook from ~/.claude/settings.json (idempotent)."""
+    try:
+        settings = _read_settings()
+    except json.JSONDecodeError as exc:
+        print(f"  ! {SETTINGS_FILE} is not valid JSON ({exc}); refusing to touch it.", file=sys.stderr)
+        return
+    session_start = settings.get("hooks", {}).get("SessionStart", [])
+    present = any(
+        _hook_refers_to_check(entry.get("command", ""))
+        for group in session_start
+        for entry in group.get("hooks", [])
+    )
+    if not present:
+        print("  no update-check hook was present; nothing to do.")
+        return
+
+    bak = _timestamped_backup(SETTINGS_FILE)
+    print(f"  backed up {SETTINGS_FILE.name} -> {bak.name}")
+    kept_groups = []
+    for group in session_start:
+        entries = [e for e in group.get("hooks", []) if not _hook_refers_to_check(e.get("command", ""))]
+        if entries:                             # keep groups that still have other hooks
+            group["hooks"] = entries
+            kept_groups.append(group)
+    # Prune emptied structures so we don't leave a dangling "SessionStart": [] / "hooks": {}.
+    if kept_groups:
+        settings["hooks"]["SessionStart"] = kept_groups
+    else:
+        settings["hooks"].pop("SessionStart", None)
+        if not settings["hooks"]:
+            settings.pop("hooks", None)
+    _write_settings(settings)
+    print("  removed the SessionStart update-check hook.")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Deploy the working methodology to ~/.claude, or capture live edits back.",
@@ -92,12 +250,21 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command")
     sub.add_parser("install", help="repo -> ~/.claude (backs up anything it replaces)")
     sub.add_parser("capture", help="~/.claude -> repo (stage live edits for commit)")
+    sub.add_parser("check", help="check GitHub for a newer methodology version (verbose)")
+    sub.add_parser("enable-hook", help="notify at Claude Code startup when an update exists")
+    sub.add_parser("disable-hook", help="remove the update-check hook")
 
     args = parser.parse_args(argv)
     if args.command == "install":
         install()
     elif args.command == "capture":
         capture()
+    elif args.command == "check":
+        check()
+    elif args.command == "enable-hook":
+        enable_hook()
+    elif args.command == "disable-hook":
+        disable_hook()
     else:
         # No/unknown subcommand: show usage and exit non-zero so a caller can detect misuse.
         parser.print_help(sys.stderr)

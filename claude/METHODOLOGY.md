@@ -6,9 +6,11 @@
 > as a living document: when a rule proves wrong or missing in real use, revise it here
 > and record why in the project's decision log.
 >
-> **Version 0.2** (2026-07-06). Deployed as: lean core → `~/.claude/CLAUDE.md`; this
-> reference → `~/.claude/METHODOLOGY.md`; doc scaffolding → the `init-project-docs` skill.
-> Enforcement hooks for P1/P2 are planned for v0.3 after further real-project use.
+> **Version 0.3.0** (2026-07-06). Deployed as: lean core → `~/.claude/CLAUDE.md`; this
+> reference → `~/.claude/METHODOLOGY.md`; doc scaffolding → the `init-project-docs` skill;
+> version + changelog + update-check hook → `claude/VERSION`, `claude/CHANGELOG.md`,
+> `claude/hooks/check_version.py`. Enforcement hooks for P1/P2 (a *different* mechanism from
+> the update-check hook shipped in v0.3.0) are planned for v0.4 after further real-project use.
 
 ## How to read this
 Two structures, on different axes:
@@ -164,16 +166,6 @@ project keeps a local `docs/METHODOLOGY.md` only to pin a specific version.
 - Dated logs are newest-first; cross-link between docs instead of duplicating.
 
 ## Changelog
-- **v0.2 (2026-07-06)** — First experience-driven revision, after real use showed the Q&A
-  process under-asking. Strengthened **R1**: questioning is now multi-round with a floor
-  (≥2 rounds for new work, ≥3 when also large), each round drilling into the last, made
-  broad *and* deep (assumptions / edge cases / failure modes / success criteria), stopping
-  only at demonstrated saturation, and defaulting to *ask more* when unsure. Rewrote **R3**:
-  questions are posed as precise, structured, self-contained options — the "avoid menus"
-  guidance is dropped (ambiguity, not menus, was the problem) — with prose reserved for
-  explaining tradeoffs; R3 never caps how much R1 asks. The `init-project-docs` skill was
-  updated to match. Enforcement hooks deferred to v0.3.
-- **v0.1 (2026-07-02)** — Initial extraction from the voice-assistant-concierge project's
-  conventions; generalized to be technology-agnostic; added R1 (disambiguate first) and the
-  OODA operating loop; strengthened D2 to "comment everything (how + why)." Deployed as a
-  lean core + this reference + the `init-project-docs` skill. Enforcement hooks deferred.
+The machine-readable, per-release changelog now lives in **`claude/CHANGELOG.md`** — the same
+file the update-notification hook parses to show what changed. See it for the full history
+(0.1.0 → today); this reference no longer keeps a second, drifting copy.

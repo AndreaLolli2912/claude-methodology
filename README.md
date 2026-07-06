@@ -51,8 +51,11 @@ revised and the reason logged — that's how this reached **v0.2**. The always-o
 ## Contents
 - `claude/CLAUDE.md` — the always-on core (loaded in every project)
 - `claude/METHODOLOGY.md` — the full rule reference (read on demand)
+- `claude/CHANGELOG.md` — the per-release history (also what the update check reads)
+- `claude/VERSION` — the machine-readable current version (single source of truth)
 - `claude/skills/init-project-docs/SKILL.md` — scaffolds a project's standard docs
-- `sync.py` — one script, two directions: deploy into `~/.claude`, or capture live edits back
+- `claude/hooks/check_version.py` — SessionStart hook that flags when a newer version exists
+- `sync.py` — one script: deploy into `~/.claude`, capture edits back, or check/enable the update hook
 
 ## Install on a new machine
 1. Get this folder onto the machine — `git clone <your-repo-url>`, or copy it via any channel
@@ -69,6 +72,31 @@ The repo is the source of truth, so the round-trip is one script, two directions
 - **Edited the live files in `~/.claude`?** Pull them back, then commit:
   `python sync.py capture`  →  `git add -A; git commit -m "..."; git push`
 - **On another machine:** `git pull`, then `python sync.py install`.
+
+## Staying up to date
+`sync.py install` is a one-shot copy — it can't tell you when a *newer* methodology version is
+published later. If you don't Watch this repo on GitHub, two ways to find out:
+
+**On demand** — ask any time:
+```
+python sync.py check
+```
+It compares your installed `~/.claude/VERSION` against the version on GitHub and, if you're
+behind, prints the changelog of exactly what you'd gain.
+
+**Automatically, inside Claude Code** (opt-in) — set it once:
+```
+python sync.py enable-hook      # add it     ·     python sync.py disable-hook   # remove it
+```
+This adds a `SessionStart` hook to `~/.claude/settings.json` (your existing settings are backed
+up first and fully preserved). From then on, when you start a new Claude Code session and a
+newer version exists, you'll see a short notice of what changed — then you decide whether to
+`git pull` and `python sync.py install`.
+
+The check is deliberately unobtrusive: it runs at most **once a day** (cached in between), times
+out fast, stays **silent when you're up to date or offline**, and never blocks a session. It
+makes one HTTPS request to GitHub; to turn it off, run `disable-hook` or set the environment
+variable `METHODOLOGY_UPDATE_CHECK=0`.
 
 ## Notes
 - `install` **overwrites** the bundled files in `~/.claude`, backing up any existing copy as
