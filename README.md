@@ -48,6 +48,27 @@ revised and the reason logged — that's how it keeps improving. The always-on c
 `claude/CLAUDE.md`; the full Requirements / Project / Development / Testing rule set lives in
 `claude/METHODOLOGY.md`.
 
+## The docs it creates in your projects — so nothing surprises you
+When you work on a project with this methodology, Claude keeps a small, **standard set of docs**
+and *maintains* them as you go (that's the "log decisions" and "keep docs in sync" invariants). It
+sets them up with the `init-project-docs` skill, which **asks you a few questions first** — it
+doesn't just dump files on you. So if a `docs/` folder appears, that's expected, and every file
+has exactly one job:
+
+| File | What it's for |
+|---|---|
+| `README.md` | Orientation + quick start — the front door |
+| `CLAUDE.md` | Instructions auto-loaded into every Claude session for the project |
+| `docs/OVERVIEW.md` | What you're building, why, the roadmap, and current status |
+| `docs/DECISIONS.md` | A dated log of what changed and *why* (newest first) |
+| `docs/ARCHITECTURE.md` | The components, their boundaries, and the tech stack |
+| `docs/CONTRIBUTING.md` | How to change each part safely |
+| `docs/RISKS.md` | Things that work now but will bite under scale or deployment |
+| `docs/PLAYBOOK.md` | Reusable, cross-project build recipes |
+
+You're not forced into all of them — tell Claude to skip any you don't want. The payoff is a
+project that explains itself later, instead of "why is it built like this?" archaeology.
+
 ## Contents
 - `claude/CLAUDE.md` — the always-on core (loaded in every project)
 - `claude/METHODOLOGY.md` — the full rule reference (read on demand)
