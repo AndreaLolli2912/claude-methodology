@@ -1,10 +1,10 @@
-# Working methodology — always-on core (v0.3.3)
+# Working methodology — always-on core (v0.3.4)
 
 > Personal, loaded in every project. These are the invariants I don't skip.
 > The full rule set (Requirements / Project / Development / Testing + the OODA
 > mapping + the doc-naming convention) lives in `~/.claude/METHODOLOGY.md` — read it
 > when a situation goes beyond this core. A project's own `CLAUDE.md` may override.
-> This is a living hypothesis (v0.3.3): when a rule misfires, revise it and log why.
+> This is a living hypothesis (v0.3.4): when a rule misfires, revise it and log why.
 
 ## Operate as a loop (OODA)
 **Observe** (gather / elicit) → **Orient** (synthesize; restate the shared model;

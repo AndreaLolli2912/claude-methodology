@@ -7,7 +7,7 @@
 |---|---|---|---|
 | 1 | **Duplicated file manifest.** The bundle-owned path list used to be copy-pasted across two scripts. | Medium | Resolved — single `MANIFEST` in `sync.py` |
 | 2 | **No cross-platform transport.** Old scripts were PowerShell-only; macOS/Linux couldn't install/capture. | Medium | Resolved & verified (Win + Linux) |
-| 3 | **Silent divergence between repo and `~/.claude`.** Edit live, forget to `capture` → next `install` overwrites your live edits. | High | Mitigated by `.bak` backups only |
+| 3 | **Silent divergence between repo and `~/.claude`.** Edit live, forget to `capture` → next `install` overwrites your live edits. | High in theory / Low in practice | Overwrite doesn't occur in the repo-only workflow; read-only `status` readout planned |
 | 4 | **`sync.py install` overwrites the whole `~/.claude/CLAUDE.md`.** Unrelated personal instructions there are replaced (backed up, but not merged). | Medium | Documented in README |
 | 5 | **Root `CLAUDE.md` is gitignored** → not synced; a fresh clone won't have it, and its content only exists on the machine that created it. | Low | Accepted (by design) |
 | 6 | **Transport now requires Python 3.** A machine without Python can't install/capture. | Low | Accepted — user runs Python everywhere; stdlib-only |
@@ -25,9 +25,15 @@ per-OS home directory. Verified on both Windows and real Linux (Ubuntu):
 `HOME=/tmp/x python3 sync.py install` resolved `$HOME`, created the nested `skills/…` path,
 and deployed all 3 files.
 
-**#3 — Divergence.** There is no merge — only one-directional overwrite. The `.bak` files on
-install are the only safety net, and they're easy to overlook. *Fix:* a `status`/diff check
-that warns when live and repo differ before install; discipline to `capture` before `install`.
+**#3 — Divergence (reframed 2026-07-13).** Originally: edit `~/.claude` live, forget to `capture`,
+and the next `install` silently overwrites those live edits (only an easily-missed `.bak` to
+recover). In practice the sole developer **always edits in the repo and then installs — never edits
+live files directly** — so this overwrite essentially never happens, and the real-world severity is
+low. (If the workflow ever includes live edits again, the original High risk returns.) The benign gap
+that *does* matter is the reverse: after pulling or editing the repo you may forget to `install`,
+leaving the live `~/.claude` behind the repo. *Planned:* a **report-only `sync.py status`** that shows
+where you stand across GitHub ↔ repo ↔ live, so nothing is silently out of step (see OVERVIEW and the
+DECISIONS entry).
 
 **#4 — Global CLAUDE.md overwrite.** If the machine keeps other content in
 `~/.claude/CLAUDE.md`, install replaces it wholesale (backing it up first). *Fix:* split the

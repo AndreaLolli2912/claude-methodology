@@ -18,6 +18,9 @@ Two layers, deliberately kept separate:
 content's meaning, only which relative paths the bundle owns:
 - `sync.py install` — repo → `~/.claude` (deploy; backs up what it replaces).
 - `sync.py capture` — `~/.claude` → repo (reverse; stage live edits for commit).
+- `sync.py status` — read-only readout of where you stand across GitHub ↔ repo ↔ live
+  `~/.claude` (git ahead/behind/uncommitted + a byte-compare of the bundle vs `~/.claude`);
+  it only looks and prints, never writes.
 - `README.md` — human entry point (install / sync instructions).
 
 One cross-platform script (Python 3, standard-library only) covers every OS; `Path.home()`

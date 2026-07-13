@@ -3,6 +3,39 @@
 > Why things are the way they are. Add a dated entry whenever a task finishes or a plan is
 > executed (newest first). Keep each entry short: what changed and why.
 
+### 2026-07-13 — `sync.py status` built & verified (Steps 2–5 of the pilot)
+Implemented the report-only `status` command: a git check (uncommitted / ahead / behind / diverged,
+via a timeout-capped `git fetch` that degrades to "couldn't reach GitHub" when offline) plus a
+byte-compare of the `MANIFEST` bundle files against the live `~/.claude` (the repo-vs-live gap no git
+command can see). It reports every condition that applies at once, returns exit 0 only when fully in
+sync (else 1), and changes nothing. Reused the existing `MANIFEST` as the compare set and mirrored
+`update()`'s subprocess style; `GIT_TERMINAL_PROMPT=0` + a fetch timeout keep it from hanging on a
+dead network. Verified end-to-end on throwaway repos + a fake `HOME`: 17/17 checks across
+not-installed, in-sync, repo-ahead-of-live, unpushed, GitHub-ahead, uncommitted, offline, and
+plain-copy — plus a writes-nothing assertion on both `~/.claude` and the working tree. Testing caught
+one real bug: an em dash in the output mangled on the Windows console, fixed to plain ASCII (matching
+the rest of `sync.py`). Pending Step 6 (Shipping): version bump, `CHANGELOG`, and the commit/push
+(user approves).
+
+### 2026-07-13 — `sync.py status`: Need settled (Step 1 of the by-hand workflow pilot)
+First real task run through the six-step adversarial workflow (`docs/WORKFLOW.md`, M1) by hand —
+Claude as builder, a subagent as challenger, the user as judge. Step 1 (Need) reshaped the task twice:
+1. **Direction can't be guessed from timestamps.** The first idea had `status` say which side was
+   "newer" and recommend capture-vs-install. A throwaway experiment killed it: git stamps working-tree
+   files at *pull/clone* time (not edit time) and `install` (`copy2`) preserves mtime, so after an
+   unrelated pull the repo can look "newer" than an un-captured live edit — a timestamp-based "run
+   install" hint would then destroy that edit. So the tool never infers direction from mtime.
+2. **The original risk-#3 danger doesn't apply.** Established that the sole developer always edits in
+   the repo then installs, never editing live files — so "install overwrites forgotten live edits"
+   never occurs. The task was reframed from a danger-guard into a **report-only status readout**.
+**Settled Need:** `sync.py status` reports, in plain English, where you stand across the whole chain —
+**GitHub ↔ repo ↔ live `~/.claude`** — and what to do next. It never acts (no commit / push / pull /
+install / file edits), reports every condition that applies at once, and degrades gracefully offline,
+with no remote, or on a plain non-git copy. Its uniquely valuable part (no git command can see it):
+"your live `~/.claude` is behind the repo — you haven't installed the latest." *How* to detect the
+repo-vs-live gap and whether to emit a scripting exit code are Step 2 (Design). See OVERVIEW; RISKS #3
+reframed.
+
 ### 2026-07-13 — Adversarial phased workflow designed & documented (`docs/WORKFLOW.md`)
 Worked out a major new direction and captured it in `docs/WORKFLOW.md`: turn the declarative rules
 into an **active six-step workflow** — Need → Design → Architecture → Implementation → Judgment →

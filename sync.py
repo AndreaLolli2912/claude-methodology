@@ -5,6 +5,7 @@ One cross-platform entry point (Windows + macOS/Linux), standard-library only, s
 anywhere Python 3 is present with nothing to install.
 
     python  sync.py               # THE everyday command: update — pull the latest, then install
+    python  sync.py status        # report where you stand: GitHub <-> repo <-> live (read-only)
     python  sync.py enable-hook   # (once) get told at Claude Code startup when an update exists
 
   Occasional / under the hood:
@@ -26,6 +27,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -303,6 +305,183 @@ def disable_statusline() -> None:
     print("  removed the status line.")
 
 
+# --- Status: "where do I stand?" (GitHub <-> repo <-> live ~/.claude) ---------------------
+# A READ-ONLY readout. `status` never commits, pushes, pulls, installs, or edits any file — it
+# only looks and prints. It answers "am I fully in sync?" across the whole chain:
+#     GitHub   <->   this repo   <->   the live ~/.claude on this machine
+# The GitHub<->repo half mirrors what `git status` could tell you; the repo<->live half is the
+# genuinely useful part, because no git command can see ~/.claude — only we can tell you
+# "you pulled new files but haven't run install, so your live setup is behind the repo".
+
+
+def _git(*args, timeout=None):
+    """Run `git -C <repo> <args>`; return (returncode, stdout, stderr) as stripped strings.
+
+    A defensive wrapper so the caller never crashes: if git isn't installed (FileNotFoundError)
+    or a network `fetch` hangs past `timeout`, we return a non-zero code with the reason in
+    stderr, and the caller turns that into a plain-English line. `GIT_TERMINAL_PROMPT=0` stops
+    git from popping an interactive credential prompt (which could hang a fetch on a machine with
+    no stored auth) — it fails fast instead, which we report as "couldn't reach GitHub".
+    """
+    env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
+    try:
+        proc = subprocess.run(
+            ["git", "-C", str(REPO_ROOT), *args],
+            capture_output=True, text=True, env=env, timeout=timeout,
+        )
+        return proc.returncode, proc.stdout.strip(), proc.stderr.strip()
+    except FileNotFoundError:
+        return 127, "", "git was not found on PATH"
+    except subprocess.TimeoutExpired:
+        return 124, "", "git timed out"
+
+
+def _git_status() -> dict:
+    """Work out where the repo stands versus GitHub. Returns a small dict describing it.
+
+    `kind` is one of:
+      'not_git'   — a plain folder copy (no .git); nothing to compare to GitHub.
+      'no_remote' — a git repo, but this branch has no GitHub tracking branch to compare against.
+      'ok'        — comparable; the dict then also carries:
+                      uncommitted (int)  how many changes aren't committed,
+                      reached (bool)     did the network fetch actually reach GitHub,
+                      ahead (int)        commits you have that GitHub doesn't,
+                      behind (int)       commits GitHub has that you don't.
+    """
+    # A USB/OneDrive-style plain copy has no .git, so there's nothing git can tell us.
+    if not (REPO_ROOT / ".git").exists():
+        return {"kind": "not_git"}
+
+    # Uncommitted work = every line `git status --porcelain` prints (modified/staged/untracked).
+    rc, out, _ = _git("status", "--porcelain")
+    uncommitted = len(out.splitlines()) if rc == 0 and out else 0
+
+    # `@{upstream}` is this branch's GitHub tracking branch. If it isn't set, there's nothing on
+    # GitHub to compare to (e.g. a brand-new local branch) — say so rather than guess.
+    rc_up, _, _ = _git("rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}")
+    if rc_up != 0:
+        return {"kind": "no_remote", "uncommitted": uncommitted}
+
+    # The one network step: refresh our copy of GitHub's state. Cap it so a dead network can't
+    # hang the command, and remember whether it actually succeeded (offline => stale comparison).
+    rc_fetch, _, _ = _git("fetch", "--quiet", timeout=15)
+    reached = rc_fetch == 0
+
+    # Count the gap. With `@{upstream}...HEAD`, the left count is commits on GitHub-not-here
+    # (behind) and the right count is commits here-not-on-GitHub (ahead).
+    rc_c, counts, _ = _git("rev-list", "--left-right", "--count", "@{upstream}...HEAD")
+    behind = ahead = 0
+    parts = counts.split()
+    if rc_c == 0 and len(parts) == 2:
+        behind, ahead = int(parts[0]), int(parts[1])
+
+    return {"kind": "ok", "uncommitted": uncommitted, "reached": reached,
+            "ahead": ahead, "behind": behind}
+
+
+def _live_status() -> list:
+    """Compare each bundle-owned file in the repo against its live ~/.claude copy, byte for byte.
+
+    Returns a list of (relative_path, state) for every file NOT in sync — state is 'missing'
+    (never installed on this machine) or 'differs' (the live copy isn't the repo's current copy).
+    An empty list means the live ~/.claude is fully up to date. Read-only: it reads bytes only.
+    """
+    out_of_sync = []
+    for rel in MANIFEST:
+        repo_file = BUNDLE_DIR / rel
+        live_file = TARGET_DIR / rel
+        # A file the manifest names but the repo lacks is a repo/bundle problem, not a live one;
+        # install/capture already warn about a missing source, so we just skip it here.
+        if not repo_file.exists():
+            continue
+        if not live_file.exists():
+            out_of_sync.append((rel, "missing"))
+        elif repo_file.read_bytes() != live_file.read_bytes():
+            out_of_sync.append((rel, "differs"))
+    return out_of_sync
+
+
+def status() -> int:
+    """Print where this machine stands across GitHub <-> repo <-> live ~/.claude, and return an
+    exit code: 0 when everything is confirmed in sync, 1 when there's something to do (or we
+    couldn't fully confirm, e.g. offline). Read-only — it changes nothing.
+    """
+    git = _git_status()
+    live = _live_status()
+
+    lines = []      # the report lines we'll print, one situation each
+    todo = []       # plain-English next steps, collected as we find things out of sync
+    synced = True   # flips to False on anything not confirmed in sync
+
+    # --- GitHub <-> repo ---------------------------------------------------------------------
+    if git["kind"] == "not_git":
+        lines.append("  GitHub   this is a plain copy (no git) - can't compare to GitHub.")
+        synced = False
+    elif git["kind"] == "no_remote":
+        lines.append("  GitHub   no GitHub link for this branch - nothing to compare.")
+        synced = False
+        if git["uncommitted"]:
+            lines.append(f"           (plus {git['uncommitted']} uncommitted change(s) here.)")
+    else:
+        parts = []
+        if git["uncommitted"]:
+            parts.append(f"{git['uncommitted']} uncommitted change(s)")
+            todo.append("commit your changes when ready:  git add -A; git commit")
+        # Ahead AND behind at once = the histories have diverged; report that as one thing rather
+        # than two, because the fix (reconcile by hand) is different from a plain push or pull.
+        if git["ahead"] and git["behind"]:
+            parts.append(f"DIVERGED: {git['ahead']} local vs {git['behind']} on GitHub "
+                         "(reconcile by hand)")
+        elif git["ahead"]:
+            parts.append(f"{git['ahead']} commit(s) not pushed to GitHub yet")
+            todo.append("push to GitHub when ready:  git push")
+        elif git["behind"]:
+            parts.append(f"GitHub is ahead by {git['behind']} commit(s)")
+            todo.append("pull GitHub's changes:  python sync.py")
+
+        if not git["reached"]:
+            # We couldn't refresh from GitHub, so anything we say about ahead/behind is only as
+            # current as the last successful fetch — flag that rather than imply certainty.
+            synced = False
+            if parts:
+                lines.append("  GitHub   " + "; ".join(parts)
+                             + "  (couldn't reach GitHub - may be out of date).")
+            else:
+                lines.append("  GitHub   couldn't reach GitHub (offline?) - in sync as far as we "
+                             "last knew.")
+        elif parts:
+            synced = False
+            lines.append("  GitHub   " + "; ".join(parts) + ".")
+        else:
+            lines.append("  GitHub   in sync - nothing to push or pull.")
+
+    # --- repo <-> live ~/.claude -------------------------------------------------------------
+    if live:
+        synced = False
+        missing = sum(1 for _, s in live if s == "missing")
+        differ = sum(1 for _, s in live if s == "differs")
+        detail = []
+        if differ:
+            detail.append(f"{differ} file(s) older than the repo")
+        if missing:
+            detail.append(f"{missing} file(s) not installed yet")
+        lines.append("  Live     behind - " + ", ".join(detail) + ".")
+        todo.append("update your live ~/.claude:  python sync.py install")
+    else:
+        lines.append("  Live     up to date - ~/.claude matches the repo.")
+
+    # --- print the readout -------------------------------------------------------------------
+    print("Where you stand:\n")
+    print("\n".join(lines))
+    if todo:
+        print("\nWhat to do:")
+        for step in todo:
+            print(f"  - {step}")
+    else:
+        print("\nAll in sync. Nothing to do.")
+    return 0 if synced else 1
+
+
 def update() -> None:
     """One-command update: `git pull` the repo, then `install` the refreshed files into ~/.claude.
 
@@ -373,6 +552,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("update", help="git pull the latest, then install (one-command update)")
     sub.add_parser("capture", help="~/.claude -> repo (stage live edits for commit)")
     sub.add_parser("check", help="check GitHub for a newer methodology version (verbose)")
+    sub.add_parser("status", help="report where you stand: GitHub <-> repo <-> live ~/.claude (read-only)")
     sub.add_parser("enable-hook", help="notify at Claude Code startup when an update exists")
     sub.add_parser("disable-hook", help="remove the update-check hook")
     sub.add_parser("enable-statusline", help="show model|effort|context|quota in the status line")
@@ -387,6 +567,9 @@ def main(argv: list[str] | None = None) -> int:
         capture()
     elif args.command == "check":
         check()
+    elif args.command == "status":
+        # status returns its own exit code (0 = fully in sync, 1 = something to do) — pass it up.
+        return status()
     elif args.command == "enable-hook":
         enable_hook()
     elif args.command == "disable-hook":

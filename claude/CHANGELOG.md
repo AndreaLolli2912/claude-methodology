@@ -5,6 +5,14 @@
 > the human-readable changelog. Each release is one `## <semver> — <date>` heading followed
 > by `- ` bullet lines. Newest first. Keep the heading grammar stable — a parser binds to it.
 
+## 0.3.4 — 2026-07-13
+- Added `python sync.py status`: a **read-only** readout of where you stand across
+  GitHub ↔ repo ↔ live `~/.claude`. It reports git state (uncommitted / not-pushed /
+  GitHub-ahead / diverged, via a timeout-capped `git fetch` that degrades gracefully when
+  offline) and byte-compares the bundle against `~/.claude` to catch the one thing no git
+  command can see — "you pulled but haven't run `install`, so your live setup is behind the
+  repo". Reports every condition at once; exits 0 only when fully in sync; changes nothing.
+
 ## 0.3.3 — 2026-07-13
 - Added a custom **status line** (`claude/statusline.py`): a compact monochrome-green
   `mdl:… eff:… ctx:… 5h:…` line — model, reasoning effort, context (% + tokens used / window size), and the 5-hour Max
