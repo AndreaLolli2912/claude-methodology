@@ -37,3 +37,27 @@ instead. Keep the content/transport and code/docs boundaries visible in ARCHITEC
 **How you know it worked:** `docs/` holds the full set, each with a purpose header, and the
 decision log's newest entry records the scaffold.
 **Pointers:** `claude/skills/init-project-docs/SKILL.md`, `docs/` (2026-07).
+
+## Report sync/drift state without lying about "which side is newer"
+**When you need this:** you're building a "where do I stand?" / "is it in sync?" check between two
+copies of files (a repo vs a deployed copy, local vs remote, two mirrors), and you're tempted to use
+file modification time to decide which side is newer or which way to sync.
+**The trap:** a file's mtime does **not** mean "when someone last edited this." Git rewrites
+working-tree file times to the moment of the operation on every clone, checkout, and pull; and a plain
+byte-copy (`shutil.copy2`, `cp -p`) *preserves* the source's mtime. So after an ordinary pull, an
+untouched repo file can look *newer* than a genuinely-edited copy on the other side — and a naive
+"newer side wins → overwrite the older" rule then destroys real work. (Proven here with a throwaway
+probe: a fresh clone stamps files at clone time, and a pull that updates a file stamps it at pull time.)
+**The path:**
+1) Compare **content**, not timestamps — a byte compare (or hash) reliably tells you *that* two copies
+   differ.
+2) For *direction* ("which way should I sync?"), use a source that actually records intent: git itself
+   (`git status` for uncommitted work; `git rev-list --left-right --count @{upstream}...HEAD` for
+   ahead/behind). If no reliable signal exists, **report the difference and let the human decide** —
+   never guess.
+3) Keep the check **read-only** and make it **degrade honestly** — offline / no remote / not-a-git-copy
+   must say so, never silently report "in sync."
+**How you know it worked:** the check flags exactly the files that differ, only points a direction when
+it truly knows, and writes nothing (assert that in a throwaway run).
+**Pointers:** `sync.py` (`status` + `_git_status`/`_live_status`), `DECISIONS.md` 2026-07-13 (the
+mtime experiment) (2026-07).
