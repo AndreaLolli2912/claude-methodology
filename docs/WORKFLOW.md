@@ -6,8 +6,10 @@
 > **Maintenance:** this is a design spec, **not yet built** — the source of truth for that build.
 > Update it whenever a decision here changes, and log the change in `DECISIONS.md` (P1).
 >
-> **Status (2026-07-13):** theory complete and agreed; build not started. The immediate next step
-> is to *validate the flow by hand* before building anything (see **Build plan** at the end).
+> **Status (2026-07-13):** theory complete and agreed. **M1 (validate the flow by hand) passed** — a
+> real task made a visibly better decision than a normal chat and left resumable docs. Two lessons
+> from M1 are folded in below (operator context in challenger rule 6; effort triage in rule 7). Next
+> is **M2** — technical design + de-risk reliable automatic firing (see **Build plan** at the end).
 
 ## Context — why this exists
 Today the methodology only *describes* good practice: rules sitting in `~/.claude/CLAUDE.md` and
@@ -92,10 +94,21 @@ into agreeing). Its nine rules:
    human accepts and it's settled. (Same stop-rule as **R1**.)
 6. **Fresh each step; reads only the written record.** Starts clean and sees only the *thing being
    judged plus the settled docs* — never the builder's private thinking. So the self-writing docs do
-   double duty: the memory of decisions *and* the challenger's unbiased reading material.
-7. **Matches effort to novelty.** A well-worn, obviously-right choice gets a *quick* "does it fit
-   our situation?" check; a genuinely new choice gets the full multi-round attack. Familiar never
-   means unchecked — just a lighter check. (Same idea as **R1**.)
+   double duty: the memory of decisions *and* the challenger's unbiased reading material. The record
+   it is handed also includes **`OPERATOR.md`** — how the developer actually works — because a
+   subagent inherits **none** of the main chat's memory: anything tacit (a working habit, an
+   environment quirk) is invisible to it unless written down and passed in. M1 proved this the hard
+   way — the fact that reshaped the whole task lived only in the human's head, so the *human*, not the
+   challenger, caught it. The rule underneath: **the challenger is only as sharp as the written
+   context it is handed.**
+7. **Matches effort to novelty — weight set deliberately, not by default.** A well-worn,
+   obviously-right choice gets a *quick* "does it fit our situation?" check; a genuinely new choice
+   gets the full multi-round attack. Familiar never means unchecked — just a lighter check. (Same idea
+   as **R1**.) M1 showed this rule doesn't fire on its own — it ran near-full rounds on a familiar
+   feature and felt heavy for the size. So a task (and each step) **opens with a quick
+   size-and-novelty read that sets the expected number of rounds**: a one-file, familiar change starts
+   light and escalates only if the challenger actually finds something; a genuinely new subsystem
+   starts heavy. The weight is *chosen* up front, never assumed to be "full".
 8. **Calls for an experiment when arguing can't settle it.** When a crux depends on a real-world
    fact about *our own thing* ("is it fast enough?", "does it hold at scale?"), it stops debating
    and calls for a small throwaway experiment (**R4**). The *builder* runs the probe; the result is
@@ -229,10 +242,14 @@ system is built by its own rules. **Each item is a fresh conversation that reads
 - **M0 — Freeze & persist the design.** *(This document — done when it's committed to the repo.)* It
   makes "a fresh conversation reads the doc" actually work, and answers "will we lose the context?":
   no — it's a file, not chat memory.
-- **M1 — Validate the flow by hand.** Run one small real task through all six steps manually (Claude
-  as builder, a subagent as attacker, docs updated live). *Success bar:* visibly better decisions
-  than a normal chat, and docs a fresh chat could resume from. Needs no custom tech, so the technical
-  unknowns don't block it. Pass → design the tech. Fail → fix the theory first.
+- **M1 — Validate the flow by hand. ✓ PASSED (2026-07-13).** Ran a real task (`sync.py status`)
+  through the steps manually (Claude as builder, a subagent as attacker, docs updated live), and it
+  beat a normal chat on both counts: the challenger forced a throwaway experiment that killed an
+  unsafe timestamp-based feature *before* it became code, and the questioning reshaped the feature
+  from an overwrite-guard into a read-only readout — with docs that could resume a fresh chat. Two
+  lessons fed back into the theory above: **(a)** the challenger was blind to a tacit working habit
+  written nowhere → added `OPERATOR.md` + rule 6's "handed the written context"; **(b)** it was too
+  heavy for a small task because rule 7 never fired → rule 7 now sets effort up front. Next → M2.
 - **M2 — Technical design + de-risk.** Map each piece to a Claude Code primitive: per step = builder
   guidance (in the core or a skill) + an attacker subagent; a research-helper subagent; the control
   layer = status line + a soft-flag hook. Then de-risk the single riskiest assumption — **reliable

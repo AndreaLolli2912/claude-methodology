@@ -17,6 +17,23 @@ one real bug: an em dash in the output mangled on the Windows console, fixed to 
 the rest of `sync.py`). Pending Step 6 (Shipping): version bump, `CHANGELOG`, and the commit/push
 (user approves).
 
+### 2026-07-13 — Workflow M1 (validate by hand) passed; two lessons folded into the theory
+Ran the first real task (`sync.py status`) through the six-step adversarial workflow by hand (M1 in
+`WORKFLOW.md`) and judged it a pass: it made a visibly better decision than a normal chat — the
+challenger forced a throwaway experiment that killed an unsafe timestamp-based "repo is newer → run
+install" hint before it became code, and the questioning reshaped the feature from an overwrite-guard
+into a read-only status readout — and it left docs a fresh chat could resume from. Two lessons folded
+back into `WORKFLOW.md`:
+1. **The AI challenger is only as sharp as the written context it's handed.** The catch that reshaped
+   the task ("I never edit the live files, so `install` can't overwrite them") was a tacit working
+   habit written down nowhere, and a challenger subagent inherits none of the main chat's memory — so
+   the human, not the AI, had to catch it. Fix: added **`docs/OPERATOR.md`** (repo-specific "how I
+   work" facts, handed to the challenger each task) and extended challenger rule 6.
+2. **"Match effort to novelty" (rule 7) doesn't fire by itself.** M1 ran near-full challenge rounds on
+   a small, familiar feature and felt heavy. Fix: rule 7 now opens a task/step by sizing the work and
+   setting the round count up front, starting light for familiar changes.
+Next milestone: M2 — technical design + de-risk reliable automatic firing.
+
 ### 2026-07-13 — `sync.py status`: Need settled (Step 1 of the by-hand workflow pilot)
 First real task run through the six-step adversarial workflow (`docs/WORKFLOW.md`, M1) by hand —
 Claude as builder, a subagent as challenger, the user as judge. Step 1 (Need) reshaped the task twice:
