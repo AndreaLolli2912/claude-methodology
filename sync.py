@@ -44,6 +44,7 @@ MANIFEST = [
     "VERSION",                     # machine-readable current version (single source of truth)
     "CHANGELOG.md",                # parseable release history; source of the update-notice delta
     "hooks/check_version.py",      # deployed SessionStart hook that checks GitHub for updates
+    "statusline.py",               # deployed status-line renderer: model|effort|context|quota
 ]
 
 # Anchor every path off this script's own folder so the repo can be moved or renamed without
@@ -95,6 +96,7 @@ def install() -> None:
             print(f"  installed {rel}")
     print("\nDone. Restart Claude Code, then check /skills lists 'init-project-docs'.")
     print("Tip: run  python sync.py enable-hook  for in-session update notifications.")
+    print("Tip: run  python sync.py enable-statusline  to show model|effort|context|quota in the status line.")
 
 
 def capture() -> None:
@@ -114,6 +116,7 @@ def capture() -> None:
 # THAT file — not sync.py — is what ships into ~/.claude and runs as the hook. sync.py loads
 # that same module to power `sync.py check`, so there is exactly one copy of the logic (P4/P5).
 CHECK_SCRIPT_REL = "hooks/check_version.py"     # path inside the bundle AND inside ~/.claude
+STATUSLINE_REL = "statusline.py"                # status-line script, same relative path both sides
 SETTINGS_FILE = TARGET_DIR / "settings.json"    # Claude Code's user settings (personal file!)
 
 
@@ -147,6 +150,18 @@ def _write_settings(settings: dict) -> None:
     """Write settings.json back with 2-space indent + trailing newline (matching the live file)."""
     SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
     SETTINGS_FILE.write_text(json.dumps(settings, indent=2) + "\n", encoding="utf-8")
+
+
+def _python_command(script_rel: str) -> str:
+    """Build a command that runs THIS interpreter against a deployed bundle script.
+
+    Like `_hook_command` below, but reusable for any relative script path (e.g. the status line).
+    Uses `sys.executable` — the exact Python running sync.py — never a bare `python`, which on
+    some machines is the Windows Store alias stub and would silently never run (RISK #6). Both
+    paths are quoted so a space can't split the command in the shell Claude Code invokes it in.
+    """
+    script = TARGET_DIR / script_rel
+    return f'"{sys.executable}" "{script}"'
 
 
 def _hook_command() -> str:
@@ -247,6 +262,47 @@ def disable_hook() -> None:
     print("  removed the SessionStart update-check hook.")
 
 
+def enable_statusline() -> None:
+    """Point Claude Code's status line at the bundled statusline.py (idempotent).
+
+    Writes a single top-level "statusLine" object into ~/.claude/settings.json that runs the
+    deployed statusline.py through THIS interpreter (see `_python_command`). Backs the settings
+    file up first and preserves every other key. Re-running just overwrites that one object —
+    the "refresh in place" we want when, say, the interpreter path changes — so it's always safe.
+    """
+    try:
+        settings = _read_settings()
+    except json.JSONDecodeError as exc:
+        print(f"  ! {SETTINGS_FILE} is not valid JSON ({exc}); refusing to touch it.", file=sys.stderr)
+        return
+    if SETTINGS_FILE.exists():                      # never rewrite the personal file without a backup
+        bak = _timestamped_backup(SETTINGS_FILE)
+        print(f"  backed up {SETTINGS_FILE.name} -> {bak.name}")
+    # One assignment overwrites any previous statusLine, which is exactly the idempotent behaviour
+    # we want; every other setting in the dict is left untouched.
+    settings["statusLine"] = {"type": "command", "command": _python_command(STATUSLINE_REL)}
+    _write_settings(settings)
+    print("  enabled the status line (model | effort | context | quota).")
+    print("  restart Claude Code to see it under the prompt.")
+
+
+def disable_statusline() -> None:
+    """Remove the status line from ~/.claude/settings.json (idempotent)."""
+    try:
+        settings = _read_settings()
+    except json.JSONDecodeError as exc:
+        print(f"  ! {SETTINGS_FILE} is not valid JSON ({exc}); refusing to touch it.", file=sys.stderr)
+        return
+    if "statusLine" not in settings:                # nothing configured — say so and stop
+        print("  no status line was configured; nothing to do.")
+        return
+    bak = _timestamped_backup(SETTINGS_FILE)
+    print(f"  backed up {SETTINGS_FILE.name} -> {bak.name}")
+    settings.pop("statusLine", None)                # drop only our key; leave the rest as-is
+    _write_settings(settings)
+    print("  removed the status line.")
+
+
 def update() -> None:
     """One-command update: `git pull` the repo, then `install` the refreshed files into ~/.claude.
 
@@ -319,6 +375,8 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("check", help="check GitHub for a newer methodology version (verbose)")
     sub.add_parser("enable-hook", help="notify at Claude Code startup when an update exists")
     sub.add_parser("disable-hook", help="remove the update-check hook")
+    sub.add_parser("enable-statusline", help="show model|effort|context|quota in the status line")
+    sub.add_parser("disable-statusline", help="remove the status line")
 
     args = parser.parse_args(argv)
     if args.command == "install":
@@ -333,6 +391,10 @@ def main(argv: list[str] | None = None) -> int:
         enable_hook()
     elif args.command == "disable-hook":
         disable_hook()
+    elif args.command == "enable-statusline":
+        enable_statusline()
+    elif args.command == "disable-statusline":
+        disable_statusline()
     else:
         # No subcommand: run the everyday action (update on a git checkout, else install).
         default_action()

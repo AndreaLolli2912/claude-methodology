@@ -5,6 +5,15 @@
 > the human-readable changelog. Each release is one `## <semver> — <date>` heading followed
 > by `- ` bullet lines. Newest first. Keep the heading grammar stable — a parser binds to it.
 
+## 0.3.3 — 2026-07-13
+- Added a custom **status line** (`claude/statusline.py`): a compact monochrome-green
+  `mdl:… eff:… ctx:… 5h:…` line — model, reasoning effort, context (% + tokens used / window size), and the 5-hour Max
+  quota (% + wall-clock reset time) — rendered from the JSON Claude Code pipes to a `statusLine` command. Stdlib-only
+  Python (no `jq`/Git Bash needed), wired through `~/.claude/settings.json`.
+- `sync.py`'s `MANIFEST` now carries `statusline.py`, so `install`/`capture` move it like any
+  bundled file. `sync.py` also gains `enable-statusline` / `disable-statusline` to wire it into
+  `~/.claude/settings.json` (mirroring `enable-hook`).
+
 ## 0.3.2 — 2026-07-06
 - `python sync.py` with **no subcommand** now does the everyday thing — update on a git checkout,
   install on a plain copy — so there's one command to remember. The named subcommands are

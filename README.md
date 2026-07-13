@@ -76,6 +76,7 @@ project that explains itself later, instead of "why is it built like this?" arch
 - `claude/VERSION` — the machine-readable current version (single source of truth)
 - `claude/skills/init-project-docs/SKILL.md` — scaffolds a project's standard docs
 - `claude/hooks/check_version.py` — SessionStart hook that flags when a newer version exists
+- `claude/statusline.py` — a compact status line (model · effort · context %+tokens · 5h quota %+reset time); turn it on with `python sync.py enable-statusline`
 - `sync.py` — one script: deploy/update `~/.claude`, capture edits back, or check/enable the update hook
 
 ## Set it up — and keep it current — with one command
@@ -99,6 +100,25 @@ is unobtrusive: at most **once a day**, fast timeout, **silent when up to date o
 never blocks a session. Turn it off with `python sync.py disable-hook` or by setting
 `METHODOLOGY_UPDATE_CHECK=0`.
 
+## The status line (optional — set once)
+
+    python sync.py enable-statusline
+
+Puts a compact, dependency-free status line under your Claude Code prompt:
+
+    mdl:opus-4.8 eff:max ctx:8% 15.5k/200k 5h:34% @16:21
+
+- **`mdl`** — the active model.
+- **`eff`** — reasoning effort (low / medium / high / xhigh / max), shown when the model supports it.
+- **`ctx`** — context window used: percentage, plus tokens used / window size.
+- **`5h`** — your rolling 5-hour Max/Pro quota used, plus the local wall-clock time it resets.
+
+It's a small standard-library Python script (`claude/statusline.py`) that reads the session state
+Claude Code passes it and prints one line; `enable-statusline` just points Claude Code's
+`statusLine` at the deployed copy using this machine's Python — so it travels across machines the
+same way the update hook does. Restart Claude Code to see it, and turn it off any time with
+`python sync.py disable-statusline`.
+
 ## The other commands (you rarely need these)
 | Command | What it does |
 |---|---|
@@ -107,6 +127,7 @@ never blocks a session. Turn it off with `python sync.py disable-hook` or by set
 | `python sync.py install` | Deploy the files here into `~/.claude` (no pull) |
 | `python sync.py check` | Manually ask "is a newer version published?" (the hook already does this) |
 | `python sync.py enable-hook` · `disable-hook` | Turn the in-session update notice on / off |
+| `python sync.py enable-statusline` · `disable-statusline` | Show / hide the status line (model, effort, context, quota) |
 | `python sync.py capture` | Reverse direction — copy live `~/.claude` edits back into the repo, then `git commit` |
 
 **Editing the methodology yourself?** Change the files under `claude/`, run `python sync.py` to
