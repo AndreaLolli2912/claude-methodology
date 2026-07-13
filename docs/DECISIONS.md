@@ -3,6 +3,16 @@
 > Why things are the way they are. Add a dated entry whenever a task finishes or a plan is
 > executed (newest first). Keep each entry short: what changed and why.
 
+### 2026-07-13 — Adversarial phased workflow designed & documented (`docs/WORKFLOW.md`)
+Worked out a major new direction and captured it in `docs/WORKFLOW.md`: turn the declarative rules
+into an **active six-step workflow** — Need → Design → Architecture → Implementation → Judgment →
+Shipping — where at each step a *builder* proposes, a separate *challenger* (a subagent) attacks
+across multiple rounds, the human judges, and the docs write themselves. Genuinely new vs. today: the
+**challenger** (nine behaviour rules) and making the rules *run*; the rest maps onto existing
+R/P/D/T + OODA. **Not built** — this records the design only; next is M1, validate the flow by hand
+before building any machinery (R4 gate). Design settled across a long plan-mode session and persisted
+so a fresh conversation can resume from the docs (the workflow's own lifecycle rule).
+
 ### 2026-07-13 — Status line: show context tokens and the quota reset time
 Refined the status line's two data fields per the user (still v0.3.3, unreleased, so folded into
 that release rather than a new version). `ctx` now shows the raw token count against the window

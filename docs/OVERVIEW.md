@@ -31,8 +31,14 @@ every machine in sync through git.
 | 2 | Git-based sync as the primary multi-machine flow (clone → pull → install; capture → commit → push) | In use; may automate |
 | 3 | Cross-platform support — one `sync.py` runs install & capture on Windows/macOS/Linux | Done |
 | 4 | Grow the bundle (more skills/agents) as the methodology matures | In progress (v0.3.3: status line) |
+| 5 | Active adversarial workflow (six steps + a challenger) that makes the rules *run* | Designed — `docs/WORKFLOW.md`; build not started |
 
 ## Current status
+**2026-07-13** — Designed a major next direction: an active, six-step *adversarial workflow* — a
+*builder* proposes, a separate *challenger* subagent attacks, the human judges, and the docs
+self-write. Full design in `docs/WORKFLOW.md`; **not built yet** — next is a by-hand validation (M1)
+before any machinery. See DECISIONS 2026-07-13.
+
 **2026-07-13** — v0.3.3: added a custom Claude Code status line (`claude/statusline.py`,
 monochrome-green `mdl:… eff:… ctx:… 5h:…`) to the bundle; wired live via `settings.json` and
 carried by `sync.py`'s `MANIFEST`. Enabling it on a new machine is still a manual `settings.json`

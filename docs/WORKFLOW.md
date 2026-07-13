@@ -1,0 +1,253 @@
+# Workflow — the phased, adversarial way of working
+
+> **What this is:** the design for turning the personal methodology from *rules you read* into a
+> *process that runs*. Every task walks six steps; at each, a **builder** proposes and a
+> **challenger** attacks; the **human judges**; and the **docs write themselves**.
+> **Maintenance:** this is a design spec, **not yet built** — the source of truth for that build.
+> Update it whenever a decision here changes, and log the change in `DECISIONS.md` (P1).
+>
+> **Status (2026-07-13):** theory complete and agreed; build not started. The immediate next step
+> is to *validate the flow by hand* before building anything (see **Build plan** at the end).
+
+## Context — why this exists
+Today the methodology only *describes* good practice: rules sitting in `~/.claude/CLAUDE.md` and
+`METHODOLOGY.md`, plus a few active pieces (the `init-project-docs` skill, an update-check hook, a
+status line, and `sync.py`). The rules are good, but they don't *run* — following them depends on
+remembering to.
+
+This design makes them run. **Every task becomes a fresh conversation that moves through six steps.**
+At each step a **builder** (an AI that proposes) is challenged by a **challenger** (a separate AI
+whose only job is to prove the builder wrong). The **human is the judge**: nothing passes to the next
+step until it has survived the challenge and the human accepts it ("settled"). As the work proceeds,
+the **decisions and documents write themselves**. Most of this is already latent in the written
+methodology; the genuinely new ingredient is the **challenger**, which exists nowhere today.
+
+## What the methodology codes mean (so this doc stands on its own)
+Steps and rules below reference the personal methodology by short code. Full meanings:
+
+- **OODA** — the operating loop: **O**bserve (gather) → **O**rient (make sense of it) → **D**ecide
+  (choose) → **A**ct (build/test) → repeat.
+- **R1 — Disambiguate first.** When something new comes up, question it across several rounds
+  *before* proposing or building.
+- **R2 — Decide nothing by assumption.** Put up grounded options (pros/cons + a recommendation) and
+  get agreement; never choose silently.
+- **R4 — Feasibility experiment.** Gate risky work behind a small throwaway trial that tests the
+  risky assumption first.
+- **P1 — Dated decision log.** Record what changed and why, newest first (`DECISIONS.md`).
+- **P2 — Docs in sync.** Update the affected docs in the *same* change; docs never lag the code.
+- **P3 — Reusable know-how.** Capture transferable recipes, separate from history (`PLAYBOOK.md`).
+- **P4 — Separate the data-moving layer from the logic.** Keep wiring/input/output apart from the
+  parts that do the real work.
+- **P5 — Stable contracts.** Fix the interface between parts; make one side own all conversion.
+- **P6 — Risk register.** Keep a living list of things that work now but bite at deploy/scale
+  (`RISKS.md`).
+- **P7 — Exploration vs delivery.** Keep the experiment environment separate from the production one.
+- **D1 — Write for the reader.** The simplest thing that works, at the reader's level.
+- **D2 — Comment to teach.** Every block explains *how* it works and *why* it exists, for a
+  non-expert.
+- **D3 — Self-explanatory names.** No cryptic abbreviations or jargon as identifiers.
+- **T1 — Preserve experiments.** Keep each throwaway trial and a short write-up of what happened.
+- **T2 — Proof-of-success up front.** State how you'll know it worked *before* you start; confirm
+  against it at the end.
+- **T3 — Validate on realistic input, then live.** Test on representative data; confirm under real
+  conditions.
+
+## The six steps
+| # | Step | Rooted in | Builder proposes | Challenger attacks | Writes itself into |
+|---|------|-----------|------------------|--------------------|--------------------|
+| 1 | **Need** | R1 (disambiguate the requirement) | what's truly needed — for you or the end user | hunts for needs you left out or never said aloud, the things it must **NOT** do, who the real user is, and false assumptions about the problem | `OVERVIEW` |
+| 2 | **Design** | R2 (grounded options), R4 (test risky bets) | a few real options, each with its reasoning | argues against each option: why it may be the wrong choice, the trade-offs you're quietly ignoring, and a stronger bet you haven't put forward | `DECISIONS` |
+| 3 | **Architecture** | P4 (separate wiring from logic), P5 (stable contracts) | a structure drawn from known patterns | asks whether the textbook pattern truly fits *your* constraints, and flags cargo-cult pattern-matching — reusing a shape because it's familiar, not because it's right here | `ARCHITECTURE` |
+| 4 | **Implementation** | D1–D5 (readable, commented code), T1–T3 (real tests) | small blocks; each one coded, tested, and commented | red-teams each block for bugs and unhandled edge cases, code that's hard to follow, and missing or shallow tests — plus whether it truly matches the agreed Need and Design | code, tests, `DECISIONS`/`PLAYBOOK` |
+| 5 | **Judgment** | T2 (prove success), T3 (confirm live) | the evidence that it meets the Need | attacks the *proof of done* — "you only tested the happy path", "you never actually confirmed need X" — so the go/no-go call rests on real evidence, not optimism | `OVERVIEW` status + verdict |
+| 6 | **Shipping** | P6 (risks), P7 (delivery env), P3 (reusable recipe) | deploy / hand off, and harvest the lesson | probes what "works in the chat" but breaks in the real world: behaviour under real load and scale, rollback, baked-in environment assumptions, failure modes | `RISKS`, `PLAYBOOK`, release |
+
+**Judgment is the *macro* verdict** — does the finished thing solve the Need we wrote at the very
+start? — as distinct from the small *micro*-judgement the human makes at every step.
+
+## Ground rules
+- **The challenger is a separate AI (a subagent).** Independence is *the mechanism* that lets it
+  catch what the builder can't see: less shared context means fewer shared blind spots.
+- **The human makes the calls.** The AIs propose and attack; the human decides and settles.
+- **Automatic, never typed `/` commands.** Things fire on their own — by context or by event.
+- **Docs writing themselves is a hard requirement**, not a nice-to-have.
+- **The observer is the human.** (A neutral observer *AI* was considered and set aside — the human
+  already fills that seat.)
+
+## The challenger — how it behaves
+A second, *separate* AI whose only job is to prove the builder wrong. It works only if it stays
+independent: a different AI, and one **not** told the builder's private reasons (or it gets talked
+into agreeing). Its nine rules:
+
+1. **Points, doesn't build.** Names the problem and gestures at a better direction — but does not
+   write the fix itself (that would turn it back into a builder and cost its fresh eyes).
+2. **Fair and focused.** Attacks the *strongest* version of the idea, no cheap shots; reports only
+   the problems that actually matter, not nitpicks.
+3. **Stays in its step.** Works the current step; may reopen an already-settled decision only on a
+   genuine contradiction — and only the human decides whether to go back.
+4. **Warns, never blocks.** It raises flags; a serious unresolved flag must be *consciously cleared*
+   by the human before moving on. The human can debate the challenger directly.
+5. **Attacks in multiple rounds.** Builder and challenger go back and forth over several rounds,
+   each drilling into the last, until a whole round turns up nothing new that matters — then the
+   human accepts and it's settled. (Same stop-rule as **R1**.)
+6. **Fresh each step; reads only the written record.** Starts clean and sees only the *thing being
+   judged plus the settled docs* — never the builder's private thinking. So the self-writing docs do
+   double duty: the memory of decisions *and* the challenger's unbiased reading material.
+7. **Matches effort to novelty.** A well-worn, obviously-right choice gets a *quick* "does it fit
+   our situation?" check; a genuinely new choice gets the full multi-round attack. Familiar never
+   means unchecked — just a lighter check. (Same idea as **R1**.)
+8. **Calls for an experiment when arguing can't settle it.** When a crux depends on a real-world
+   fact about *our own thing* ("is it fast enough?", "does it hold at scale?"), it stops debating
+   and calls for a small throwaway experiment (**R4**). The *builder* runs the probe; the result is
+   the deciding vote.
+9. **Calls for research when nobody actually knows.** If builder, challenger, and human are *all*
+   unsure — nobody knows the fact, the best practice, or how a tool really behaves — more debate
+   won't help, because the two AIs share training blind spots and can be confidently wrong about the
+   same thing. A **research helper** (a subagent using web search/fetch) pulls in real context,
+   which then re-enters the loop and is vetted like anything else — no blind trust. (Rule 8 tests
+   *our thing*; rule 9 looks up *the world's* knowledge.)
+
+## Each step in detail
+
+### Step 1 — Need
+- **Purpose:** pin down what is *truly* needed — for you, or the person you're building for — before
+  any design or code.
+- **Two modes:**
+  - *Brand-new project:* the builder drafts the need from scratch.
+  - *Existing project:* an extra first move — **survey what's already there and rank what matters** —
+    then draft the need on top of it. (You can't state the real need for a system that already exists
+    without first understanding what's true about it.)
+- **How it goes:** builder drafts the need → challenger attacks in rounds (what's missing? what must
+  it NOT do? who is it really for? what's assumed that might be false? — and, for an existing project,
+  "what did you overlook or wrongly treat as important?") → the human decides each round → repeat
+  until a round finds nothing new → settled.
+- **Writes into:** the settled need → `OVERVIEW`, **plus how we'll know it's delivered**
+  (proof-of-success, **T2**) so Judgment later has a concrete bar. The existing-project survey seeds
+  `ARCHITECTURE` (Step 3 refines it), so no document repeats another.
+
+### Step 2 — Design
+- **Purpose:** decide *what* to build and *why* (the approach) — before worrying about internal
+  structure.
+- **How it goes:** builder puts up **a few real options**, each with its reasoning and trade-offs →
+  challenger argues against them (why each could be wrong, the trade-offs being glossed over, a
+  better bet not yet considered) → the human debates and makes the call → rounds until settled.
+- **Effort scales to novelty** (challenger rule 7): familiar choices get a quick fit-check; new ones
+  get the full attack. (Applies here *and* in Architecture.)
+- **Writes into:** the choice, *why* it was made, and *why the other options lost* → `DECISIONS`.
+
+### Step 3 — Architecture
+- **Purpose:** decide *how it's structured inside* — the parts, how they're split, the boundaries
+  between them (**P4**: keep the data-moving layer separate from the real work; **P5**: fix stable
+  contracts between parts).
+- **How it goes:** builder proposes a structure from known patterns → challenger attacks *fit to
+  your circumstances* (effort scaled to novelty) → the human decides → rounds until settled →
+  `ARCHITECTURE`.
+- **On "is it the best?":** we can't prove *best* — only that it survived a real attack and genuinely
+  fits. For cruxes reasoning can't settle (speed, scale), the challenger calls for a cheap experiment
+  (rule 8) and the evidence decides.
+
+### Step 4 — Implementation
+- **Purpose:** build the thing in **small blocks**, never one big lump.
+- **The block loop (repetitive on purpose):** build a block → test it → the attackers red-team it →
+  if it passes, it's settled; if not, find out *why* and fix it **before moving on**. A broken block
+  is never left behind for the human to trip over. Rounds per block until settled.
+- **Mandatory for every block:** a test (**T2/T3**), comments explaining *why* (**D2**), and simple,
+  readable code (**D1/D3**).
+- **A team of attackers:**
+  - *Built-in, context-free* — Claude Code's own `code-review` (bugs), `verify` (does it actually
+    run and behave), `simplify` (readability), `security-review` (safety). Reused as-is for now.
+  - *Custom, context-aware — a "fidelity" attacker (a subagent, outside the built-ins).* It reads the
+    settled docs (rule 6) and checks what the built-ins can't: does the block deliver the settled
+    Need and Design? does it respect the agreed boundaries (**P4**) and contracts (**P5**)? do its
+    tests cover the failure modes we flagged, on realistic input? are the why-comments and names
+    clear to a non-expert? In short — the built-ins own *"is this good code?"*; the custom attacker
+    owns *"is this the code we agreed to, written to our standard?"*
+- **Even here, rule 1 holds:** the attacker *points precisely* (like a review comment); the builder
+  writes the fix.
+- **Writes into:** the code and its tests; lessons → `DECISIONS`/`PLAYBOOK`.
+
+### Step 5 — Judgment
+- **Purpose:** the **macro** verdict — hold the finished build up against the **Need from Step 1**.
+  This closes the loop (the "re-Observe" of **OODA**: did the act achieve what we set out to do?).
+- **How it goes:** builder presents the *evidence* it meets the Need → challenger attacks the *proof*
+  ("happy-path only", "need X never confirmed") → the human decides **go / no-go**; a no-go sends the
+  work back to whichever earlier step actually failed (rule 3 regression).
+- **Success bar set early, checked here:** the proof-of-success (**T2**) is agreed back in
+  Need/Design and written down then; Judgment *verifies* against it, never invents it at the end.
+- **Writes into:** the verdict + a `OVERVIEW` status update (done / not done, against the Need).
+
+### Step 6 — Shipping
+- **Purpose:** deliver the finished, judged thing to the real world; harvest the reusable lesson
+  (**P3** → `PLAYBOOK`); and **persist the work** — the actual *saving somewhere*.
+- **How it goes:** builder prepares delivery → challenger attacks *real-world readiness* ("works in
+  the chat ≠ works in the world": load, scale, rollback, environment assumptions, failure modes).
+- **Two kinds of output:** (1) fix-before-you-ship blockers, resolved now; (2) risks that can't be
+  resolved now but will bite later → written into `RISKS` as documented, *accepted* risks (what it
+  is, why it bites, what to do). Nothing is left un-fixed *and* un-known.
+- **Terminal action:** generate the **commit message** and **commit/save the project** — the code
+  plus the docs that wrote themselves. This is the last thing the task-conversation does.
+- **Writes into:** `RISKS`, `PLAYBOOK`, the release/`CHANGELOG`, and the commit itself.
+
+## The conversation lifecycle (why "a fresh chat per task" works)
+Each task is **one fresh conversation**; the six steps run inside it; Step 6 **commits everything**.
+The next task is a **new conversation** with no memory of the last — so the only context it inherits
+is **what was committed** (the self-written docs + code). The commit is the **hand-off between
+conversations**: the docs *are* the memory, and a new task's Need step (existing-project mode) begins
+by surveying exactly those committed docs. This is why "docs write themselves" is load-bearing, not
+cosmetic — they are the *only* thing that survives into the next task.
+
+## The challenger: one rulebook, a specialist per step
+Not one generic critic, and not a pile of unrelated ones, but **one shared rulebook (the nine rules)
+worn by a different specialist at each step.** The attack *target* changes down the line — missing
+needs → wrong design → poor fit → broken code → thin proof → not deploy-ready — while the *rules*
+stay the same. It is built as **per-step attacker subagents** that all point at one shared rulebook
+(kept in a single place, so it isn't duplicated six times — **P5**); in Step 4 the built-in tools
+join them. Whether each specialist is a separate file or one adaptable agent is a build detail; the
+*principle* — a specialist per step — is settled.
+
+## The control layer — knowing the step, and keeping the flow honest
+Per-step specialists only work if something knows *which step we're in* and keeps the flow honest.
+Three jobs:
+1. **Awareness (know the current step).** The real source of truth is the **docs** — which ones are
+   filled and settled tells you where you are — plus a live marker in the **status line**
+   (`statusline.py`, already ours) so the current step is always visible.
+2. **Dispatch (run the right specialist).** The always-on **core** (`CLAUDE.md`) is the conductor: it
+   drives the stepped flow and brings in the right per-step attacker when that step is active.
+3. **Enforcement (keep the flow honest).** A **hook** raises a *soft flag* when you skip ahead (for
+   example, about to write code before Architecture is settled) — a reminder you consciously clear,
+   **not** a hard block. This matches challenger rule 4 ("warns, never blocks"); the human keeps the
+   wheel.
+
+This is where all the primitives converge: the **core** conducts, **skills/subagents** are the
+per-step builder and attackers, **hooks** do soft enforcement, and the **status line** shows the step.
+
+## Build plan
+Build order — each task small, tested (**T2**), logged (**P1**), and doc-synced (**P2**), so the
+system is built by its own rules. **Each item is a fresh conversation that reads this doc.**
+**Nothing heavy gets built before the flow is validated (M1) and the tech is de-risked (M2).**
+
+- **M0 — Freeze & persist the design.** *(This document — done when it's committed to the repo.)* It
+  makes "a fresh conversation reads the doc" actually work, and answers "will we lose the context?":
+  no — it's a file, not chat memory.
+- **M1 — Validate the flow by hand.** Run one small real task through all six steps manually (Claude
+  as builder, a subagent as attacker, docs updated live). *Success bar:* visibly better decisions
+  than a normal chat, and docs a fresh chat could resume from. Needs no custom tech, so the technical
+  unknowns don't block it. Pass → design the tech. Fail → fix the theory first.
+- **M2 — Technical design + de-risk.** Map each piece to a Claude Code primitive: per step = builder
+  guidance (in the core or a skill) + an attacker subagent; a research-helper subagent; the control
+  layer = status line + a soft-flag hook. Then de-risk the single riskiest assumption — **reliable
+  automatic firing without `/` commands** — with a tiny experiment before building on it.
+- **M3 — Walking skeleton (one step, end to end).** The shared rulebook + one attacker subagent
+  (start with Need) + the core conductor for that step + auto-docs for that step. Prove the pattern
+  on one step before replicating.
+- **M4 — Complete the step set.** The other five attacker subagents sharing the rulebook; wire the
+  built-in tools into Step 4; add the research-helper; auto-docs for every step.
+- **M5 — Control layer.** Status line shows the current step; one soft-flag hook for step-skips.
+- **M6 — Transport & packaging.** Grow `sync.py` to deploy whole `skills/ agents/ hooks/` directories
+  (retiring the per-file manifest); update the `CLAUDE.md` core and `METHODOLOGY.md`; bump the
+  version + `CHANGELOG`. Plain `~/.claude` bundle by default (personal use), not a plugin, unless we
+  later choose to share it.
+
+**Still open, to decide when we reach them:** whether each attacker is a separate file or one
+adaptable agent; which step to skeleton first (Need, or the Step-4 fidelity attacker); plain bundle
+vs. plugin.
