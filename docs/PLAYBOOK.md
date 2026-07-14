@@ -87,15 +87,29 @@ fresh reader can see *why* from the docs alone.
 ## Verify a hook/integration's contract against the real system, not just your unit test
 **When you need this:** you wrote a script a host system invokes on a fixed input/output contract (a
 Claude Code hook, a webhook, a plugin callback), and your tests feed it an *assumed* payload shape.
-**The trap:** the test passes because it uses the shape *you guessed*, but the host sends a different
-one — so the thing is silently inert in production while every test is green. In M2 a hook printed bare
-text to inject context, but Claude Code requires a `{"additionalContext": ...}` JSON object; the unit
-test (which only checked "something was printed") passed, and it would have done nothing live.
+**The trap:** the test passes because it uses the shape *you guessed*, but the host sends/accepts a
+different one — so the thing is silently inert in production while every test is green. In M2 the nudge
+hook went through **two** wrong output formats — bare text, then a bare `{"additionalContext": ...}`
+object — and the unit tests passed on *both*, because they asserted the shape we assumed. Claude Code
+actually requires the wrapped `{"hookSpecificOutput": {"hookEventName": "UserPromptSubmit",
+"additionalContext": ...}}`; the bare form is parsed as an empty protocol object and dropped. Only a
+live run exposed it. Lesson: a green unit test on an *assumed* contract is worth little — it will
+happily pass through several wrong fixes in a row.
 **The path:**
-1) Look up the host's actual payload/return contract in its docs *before* trusting the tests.
-2) Make the test assert the real output *format*, not just presence.
-3) Where the contract can only be confirmed live, say so and keep a short live smoke-test as an explicit
-   gate.
-**How you know it worked:** the test would fail if the output format were wrong, and a live smoke-test
-confirms the host actually invokes and honors it.
-**Pointers:** `docs/DECISIONS.md` 2026-07-14 (M2 nudge-hook bug) (2026-07).
+1) Look up the host's actual payload/return contract in its docs *before* trusting the tests, and make
+   the test assert the real output *format*, not just presence.
+2) A live smoke-test is **non-negotiable**, not a nicety — it is the only thing that proves the host
+   invokes and honors your script. Treat it as an explicit gate, not a "later".
+3) Separate three questions and test each: is the hook **registered** (the host's `/hooks`-style
+   inspector), does it **execute** (drop a temporary fire-probe — one append-to-logfile line at the top
+   of the script, so an empty log = never ran), and is its **output honored** (observe the behavior it
+   should cause)? Registered and executed are not honored.
+4) **Isolate the hook from confounds.** If another mechanism (a rules file, a default prompt) could
+   produce the same behavior, a pass proves nothing. Remove the confound: move the rules file aside so
+   only the hook can act; or run a **self-evidencing** test where the *difference* between two cases
+   isolates it (e.g. with writes auto-allowed, a doc write stays silent while a code write prompts —
+   only the hook explains the gap).
+**How you know it worked:** the test would fail if the output format were wrong, and a live run shows
+the host actually invoking and honoring it — with the hook isolated so nothing else could have caused
+the effect.
+**Pointers:** `docs/DECISIONS.md` 2026-07-14 (M2 live smoke-test + nudge-hook bug) (2026-07).

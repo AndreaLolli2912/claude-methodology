@@ -31,9 +31,20 @@ every machine in sync through git.
 | 2 | Git-based sync as the primary multi-machine flow (clone → pull → install; capture → commit → push) | In use; may automate |
 | 3 | Cross-platform support — one `sync.py` runs install & capture on Windows/macOS/Linux | Done |
 | 4 | Grow the bundle (more skills/agents) as the methodology matures | In progress (v0.3.3: status line) |
-| 5 | Active adversarial workflow (six steps + a challenger) that makes the rules *run* | Building — M1 (validate by hand) passed; **M2 (design + de-risk) passed with conditions** — machinery designed + de-risked; M3 (walking skeleton) gated on a live smoke-test (`docs/WORKFLOW.md`) |
+| 5 | Active adversarial workflow (six steps + a challenger) that makes the rules *run* | Building — M1 (by-hand) passed; **M2 (design + de-risk) passed** — machinery designed, de-risked, and live-smoke-tested; **M3 (walking skeleton) next** (`docs/WORKFLOW.md`) |
 
 ## Current status
+**2026-07-14** — **M2 complete: the live smoke-test passed, M3 unblocked.** The condition on M2's "go"
+verdict — hooks and status line actually firing in a real session — is now met. Launched Claude Code in
+the isolated spike and confirmed all three live: the status line (`wf: [need!]`), the nudge (injects the
+challenge reminder), and the skip-warner (gates an early code write). The test **earned its keep** — it
+first caught a real bug: the nudge was silently inert because it printed a bare `additionalContext`
+object instead of the `hookSpecificOutput` wrapper Claude Code requires (and even the same-day earlier
+fix was wrong); the unit tests passed through both because they asserted an *assumed* output shape.
+Fixed and re-proven live. Honest caveat: the skip-warner gates but its reason text doesn't surface (a
+generic prompt) — an M3 detail. The residual firing-rate risk (~70–80%, model-mediated, unforceable) is
+unchanged and handled by design (RISKS #9). Full detail in DECISIONS (2026-07-14).
+
 **2026-07-14** — **M2 (technical design + de-risk) is done — judged go-to-M3 *with conditions*.** The
 machinery was designed (see `ARCHITECTURE` "Workflow machinery") and de-risked with a throwaway spike:
 the deterministic chain (marker lifecycle, fail-closed receipts, the advance-gate, honest

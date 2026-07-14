@@ -7,9 +7,10 @@
 > Update it whenever a decision here changes, and log the change in `DECISIONS.md` (P1).
 >
 > **Status (2026-07-14):** theory complete and agreed. **M1 (validate by hand) passed**; **M2
-> (technical design + de-risk) passed with conditions** — the machinery is now designed (see
-> `ARCHITECTURE` "Workflow machinery") and de-risked by a throwaway spike, with go-to-M3 gated on a
-> live smoke-test (see the M2 line in **Build plan**). Lessons folded into the challenger rules below:
+> (technical design + de-risk) passed** — the machinery is designed (see `ARCHITECTURE` "Workflow
+> machinery"), de-risked by a throwaway spike, and **live-smoke-tested** (all three hooks/status-line
+> fire in a real session; the test caught and fixed a nudge that was silently inert). **M3 (walking
+> skeleton) is next** (see the M2 line in **Build plan**). Lessons folded into the challenger rules below:
 > operator context (rule 6) and effort triage (rule 7) from M1; and from **dogfooding M2** —
 > attack-anything / defend-from-the-record plus the reopening cap (rule 3), full ranked findings with
 > severity tags (rule 5), and the cold-then-warm two-pass read (rule 6).
@@ -275,17 +276,20 @@ system is built by its own rules. **Each item is a fresh conversation that reads
   lessons fed back into the theory above: **(a)** the challenger was blind to a tacit working habit
   written nowhere → added `OPERATOR.md` + rule 6's "handed the written context"; **(b)** it was too
   heavy for a small task because rule 7 never fired → rule 7 now sets effort up front. Next → M2.
-- **M2 — Technical design + de-risk. ✓ PASSED WITH CONDITIONS (2026-07-14).** Designed the machinery
+- **M2 — Technical design + de-risk. ✓ PASSED (2026-07-14).** Designed the machinery
   (one `workflow.py` script as the single independent author of every signal; a per-task marker; two
   read-only hooks; a status line — full map in `ARCHITECTURE` "Workflow machinery") and de-risked it
   with a throwaway spike. Proven off-session: the deterministic chain (marker lifecycle, fail-closed
   receipts, the gate, honest fresh/stale/missing) works every time with no false-green path; the
-  challenger's context delivery is load-bearing (a with/without-context control); and the hook payload
-  schemas match the docs (one real hook bug — a nudge printing bare text instead of the required
-  `additionalContext` JSON — was found and fixed). **Condition for M3:** a live smoke-test must confirm
-  the hooks and status line actually fire in a real session and the marker transitions read from a
-  fresh chat. Firing itself is model-mediated (~70-80%, unforceable) *by design* — the machinery makes
-  a miss **visible**, it does not prevent it.
+  challenger's context delivery is load-bearing (a with/without-context control). **Condition
+  discharged (live smoke-test passed):** all three signals fire in a real session — status line, the
+  nudge, the skip-warner — confirmed via a fire-probe (execution) plus isolation tests (output
+  honoured). The smoke-test **caught a real bug the off-session suite missed**: the nudge was silently
+  inert live, printing a bare `additionalContext` object instead of the required `hookSpecificOutput`
+  wrapper (and the earlier same-day fix was also wrong); fixed and the test now asserts the real shape.
+  Residual: firing is model-mediated (~70-80%, unforceable) *by design* — a miss is **visible**, not
+  prevented (RISKS #9). Minor: the skip-warner's reason text doesn't surface in the dialog (an M3
+  refinement).
 - **M3 — Walking skeleton (one step, end to end).** The shared rulebook + one attacker subagent
   (start with Need) + the core conductor for that step + auto-docs for that step. Prove the pattern
   on one step before replicating.

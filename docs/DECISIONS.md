@@ -3,6 +3,39 @@
 > Why things are the way they are. Add a dated entry whenever a task finishes or a plan is
 > executed (newest first). Keep each entry short: what changed and why.
 
+### 2026-07-14 — Workflow machinery: M2 condition discharged — live smoke-test passed (caught a real bug)
+Ran the live smoke-test that M2's "go, with conditions" verdict was gated on: launched Claude Code
+inside the isolated spike project and drove real prompts. **All three live signals confirmed** — the
+status line shows `wf: [need!]`; the `UserPromptSubmit` nudge injects the challenge reminder; the
+`PreToolUse` skip-warner forces a confirmation on a code write before Implementation.
+
+**The gate earned its keep — it caught a bug the entire off-session suite missed.** The nudge was
+*silently inert* live: it printed a bare `{"additionalContext": ...}`, but Claude Code only honours the
+wrapped shape `{"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": ...}}`
+and drops the bare form. Worse, the record shows the *earlier* fix (Shipping, same day: bare text →
+bare JSON) was itself wrong — bare JSON is the one format that fails. The unit tests passed through
+**both** wrong versions because they asserted an *assumed* output shape, not the real contract (now
+verified against the Claude Code hooks docs). Fixed in the spike to the wrapped form; the test asserts
+that exact nesting.
+
+**Proven without fooling ourselves — registered ≠ executed ≠ honoured.** `/hooks` showed all three
+registered; a temporary fire-probe (a log line at the top of each hook) proved Claude Code *executes*
+them; behaviour proved the *output* is honoured. The nudge was isolated by moving the project
+`CLAUDE.md` aside, so post-fix workflow awareness could come *only* from the injected context. The
+skip-warner was isolated with a **self-evidencing two-write test**: with Write auto-allowed, a *doc*
+write stayed silent while a *code* write at step `need` forced a prompt — the difference can only be
+the hook.
+
+**Honest caveat:** the skip-warner's gate fires, but its custom `permissionDecisionReason` did **not**
+visibly surface — a generic "Allow write?" prompt appeared both times. The speed-bump works; the
+"here's why" does not show on this setup. Logged as an M3 refinement, not a blocker.
+
+**Verdict: M2's condition is discharged — M2 fully passed, M3 unblocked.** The owed live half is now
+proven. The residual (the model *choosing* to spawn the challenger, ~70–80%, unforceable) stands
+unchanged and is handled by design — a miss is visible, not impossible (RISKS #9). The spike stays in
+the scratchpad (throwaway); the corrected contract (wrapped `hookSpecificOutput` for
+`UserPromptSubmit`) is carried into M3 via this entry and the PLAYBOOK recipe.
+
 ### 2026-07-14 — Workflow machinery: M2 judged (go, with conditions) and shipped (Steps 5–6)
 Ran the last two steps of the M2 dogfood. **Built** the throwaway de-risk spike — an isolated test
 project holding `workflow.py` + a per-task marker + two read-only hooks + a status line, all wired by
