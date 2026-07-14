@@ -6,10 +6,13 @@
 > **Maintenance:** this is a design spec, **not yet built** — the source of truth for that build.
 > Update it whenever a decision here changes, and log the change in `DECISIONS.md` (P1).
 >
-> **Status (2026-07-13):** theory complete and agreed. **M1 (validate the flow by hand) passed** — a
-> real task made a visibly better decision than a normal chat and left resumable docs. Two lessons
-> from M1 are folded in below (operator context in challenger rule 6; effort triage in rule 7). Next
-> is **M2** — technical design + de-risk reliable automatic firing (see **Build plan** at the end).
+> **Status (2026-07-14):** theory complete and agreed. **M1 (validate by hand) passed**; **M2
+> (technical design + de-risk) passed with conditions** — the machinery is now designed (see
+> `ARCHITECTURE` "Workflow machinery") and de-risked by a throwaway spike, with go-to-M3 gated on a
+> live smoke-test (see the M2 line in **Build plan**). Lessons folded into the challenger rules below:
+> operator context (rule 6) and effort triage (rule 7) from M1; and from **dogfooding M2** —
+> attack-anything / defend-from-the-record plus the reopening cap (rule 3), full ranked findings with
+> severity tags (rule 5), and the cold-then-warm two-pass read (rule 6).
 
 ## Context — why this exists
 Today the methodology only *describes* good practice: rules sitting in `~/.claude/CLAUDE.md` and
@@ -85,13 +88,27 @@ into agreeing). Its nine rules:
    write the fix itself (that would turn it back into a builder and cost its fresh eyes).
 2. **Fair and focused.** Attacks the *strongest* version of the idea, no cheap shots; reports only
    the problems that actually matter, not nitpicks.
-3. **Stays in its step.** Works the current step; may reopen an already-settled decision only on a
-   genuine contradiction — and only the human decides whether to go back.
+3. **May attack anything relevant; a settled decision is defended from the record.** It works the
+   current step, but nothing earlier is off-limits if it bears on the work in hand — being *settled*
+   protects nothing; being *defensible from what we wrote down* is what protects a decision. Attack a
+   settled call and one of two good things happens: we defend it by pointing at its recorded rationale
+   (it comes out re-proven), or we can't — and then it *should* reopen, usually because the real reason
+   lived in someone's head and never reached the docs (the M1 lesson, generalized). Two guardrails stop
+   this from thrashing. **The human judge — not the challenger — rules** whether the record held and
+   whether to go back (the challenger is rewarded for reopening, so it doesn't referee its own attack).
+   And **reopening is capped:** a reopened decision gets *one* round by default, not the full treatment,
+   unless the human escalates; and the cascade **stops at one hop** — the reopened decision's dependents
+   are flagged for the human to look at, not auto-re-attacked.
 4. **Warns, never blocks.** It raises flags; a serious unresolved flag must be *consciously cleared*
    by the human before moving on. The human can debate the challenger directly.
-5. **Attacks in multiple rounds.** Builder and challenger go back and forth over several rounds,
-   each drilling into the last, until a whole round turns up nothing new that matters — then the
-   human accepts and it's settled. (Same stop-rule as **R1**.)
+5. **Attacks in multiple rounds until a clean one — and reports everything, ranked.** Builder and
+   challenger go back and forth over several rounds, each drilling into the last, until a whole round
+   turns up nothing new that matters — then the human accepts and it's settled (same stop-rule as
+   **R1**). Each round the challenger returns its **full list of findings, every one tagged blocking /
+   material / minor** (blocking = breaks a stated need or invariant; material = adds real cost or risk
+   without breaking one; minor = style / nice-to-have). Only **blocking and material** findings keep
+   the rounds going; **minor** ones drop into an appendix and never spawn a new round — so "report
+   everything" can't turn into an incentive to pad the list with trivia to avoid an empty-looking round.
 6. **Fresh each step; reads only the written record.** Starts clean and sees only the *thing being
    judged plus the settled docs* — never the builder's private thinking. So the self-writing docs do
    double duty: the memory of decisions *and* the challenger's unbiased reading material. The record
@@ -100,7 +117,15 @@ into agreeing). Its nine rules:
    environment quirk) is invisible to it unless written down and passed in. M1 proved this the hard
    way — the fact that reshaped the whole task lived only in the human's head, so the *human*, not the
    challenger, caught it. The rule underneath: **the challenger is only as sharp as the written
-   context it is handed.**
+   context it is handed.** **Two passes, cold then warm.** Context both sharpens *and* anchors — hand
+   over the operator facts and the challenger catches habit-specific flaws but can glide past plain
+   logic bugs (dogfooding M2, a context-fed run called a self-contradictory proposal "coherent"). So
+   it reads in two passes: first a **cold read** of just the thing being judged plus the settled docs
+   — fresh eyes, and a test of whether the decision stands on the written record alone — then a **warm
+   pass** with `OPERATOR.md` and the assembled context added, for the habit- and domain-specific flaws.
+   One challenger does both, in that order; a genuinely separate second challenger is spun up only when
+   the two passes sharply disagree, never by default (that would just double the slow part for little
+   gain).
 7. **Matches effort to novelty — weight set deliberately, not by default.** A well-worn,
    obviously-right choice gets a *quick* "does it fit our situation?" check; a genuinely new choice
    gets the full multi-round attack. Familiar never means unchecked — just a lighter check. (Same idea
@@ -250,10 +275,17 @@ system is built by its own rules. **Each item is a fresh conversation that reads
   lessons fed back into the theory above: **(a)** the challenger was blind to a tacit working habit
   written nowhere → added `OPERATOR.md` + rule 6's "handed the written context"; **(b)** it was too
   heavy for a small task because rule 7 never fired → rule 7 now sets effort up front. Next → M2.
-- **M2 — Technical design + de-risk.** Map each piece to a Claude Code primitive: per step = builder
-  guidance (in the core or a skill) + an attacker subagent; a research-helper subagent; the control
-  layer = status line + a soft-flag hook. Then de-risk the single riskiest assumption — **reliable
-  automatic firing without `/` commands** — with a tiny experiment before building on it.
+- **M2 — Technical design + de-risk. ✓ PASSED WITH CONDITIONS (2026-07-14).** Designed the machinery
+  (one `workflow.py` script as the single independent author of every signal; a per-task marker; two
+  read-only hooks; a status line — full map in `ARCHITECTURE` "Workflow machinery") and de-risked it
+  with a throwaway spike. Proven off-session: the deterministic chain (marker lifecycle, fail-closed
+  receipts, the gate, honest fresh/stale/missing) works every time with no false-green path; the
+  challenger's context delivery is load-bearing (a with/without-context control); and the hook payload
+  schemas match the docs (one real hook bug — a nudge printing bare text instead of the required
+  `additionalContext` JSON — was found and fixed). **Condition for M3:** a live smoke-test must confirm
+  the hooks and status line actually fire in a real session and the marker transitions read from a
+  fresh chat. Firing itself is model-mediated (~70-80%, unforceable) *by design* — the machinery makes
+  a miss **visible**, it does not prevent it.
 - **M3 — Walking skeleton (one step, end to end).** The shared rulebook + one attacker subagent
   (start with Need) + the core conductor for that step + auto-docs for that step. Prove the pattern
   on one step before replicating.

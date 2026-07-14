@@ -31,9 +31,62 @@ every machine in sync through git.
 | 2 | Git-based sync as the primary multi-machine flow (clone → pull → install; capture → commit → push) | In use; may automate |
 | 3 | Cross-platform support — one `sync.py` runs install & capture on Windows/macOS/Linux | Done |
 | 4 | Grow the bundle (more skills/agents) as the methodology matures | In progress (v0.3.3: status line) |
-| 5 | Active adversarial workflow (six steps + a challenger) that makes the rules *run* | Designed — `docs/WORKFLOW.md`; build not started |
+| 5 | Active adversarial workflow (six steps + a challenger) that makes the rules *run* | Building — M1 (validate by hand) passed; **M2 (design + de-risk) passed with conditions** — machinery designed + de-risked; M3 (walking skeleton) gated on a live smoke-test (`docs/WORKFLOW.md`) |
 
 ## Current status
+**2026-07-14** — **M2 (technical design + de-risk) is done — judged go-to-M3 *with conditions*.** The
+machinery was designed (see `ARCHITECTURE` "Workflow machinery") and de-risked with a throwaway spike:
+the deterministic chain (marker lifecycle, fail-closed receipts, the advance-gate, honest
+fresh/stale/missing) works every time with no false-green path; a with/without-context control showed
+the challenger's context delivery is load-bearing; and verifying the hook payload schemas against the
+docs caught and fixed a real bug (a nudge that would have been silently inert live). **Condition for
+starting M3:** a short live smoke-test — the hooks and status line actually fire in a real session, and
+the marker's start→advance→reset transitions read from a fresh chat. Firing is model-mediated
+(~70–80%, unforceable) by design; the machinery's job is to make a miss **visible**, not prevent it.
+Dogfooding M2 also sharpened the challenger rules themselves (see `WORKFLOW.md` rules 3/5/6). Full
+detail in DECISIONS (2026-07-14).
+
+**2026-07-13** — Building the six-step workflow's own machinery (`docs/WORKFLOW.md`, milestone
+**M2** — technical design + de-risk), run as a full six-step dogfood (builder + a fresh challenger
+subagent per step + human judge). **Step 1 (Need) is settled** after three challenger rounds:
+- **What it is:** machinery that makes the six-step workflow *run on its own* at the right moments
+  instead of relying on memory, stays light on trivial work, and — because the parts that fire it are
+  model-driven and will sometimes fail — treats its real job as making **every failure visible and
+  hand-recoverable**, not firing perfectly.
+- **Must do:** know the current step from an explicit **per-task marker** (not inferred from which repo
+  docs are filled — those are already full across tasks), with a full lifecycle (created at task start
+  by a deliberate human bootstrap, advanced when a step settles, reset between tasks; absent = inert
+  here); show the step *and* whether the challenge actually ran (a receipt emitted by the challenger,
+  never self-reported by the main model); auto-hand the challenger the correct context from a fixed
+  recipe, verifiably; give step guidance at the right moment; soft-warn on skip-ahead (never block);
+  write each doc *per type* (prepend the logs — DECISIONS/RISKS/CHANGELOG; update the living docs —
+  OVERVIEW/ARCHITECTURE — in place), gated on human acceptance and self-contained for the next
+  context-free subagent; be inert in non-workflow repos.
+- **Must NOT:** drive the flow with typed `/` commands; hard-block; touch/corrupt the live `~/.claude`;
+  feed the challenger empty/wrong context; nag in unrelated repos; commit or push without approval.
+- **Entry is a human-owned bootstrap:** starting a workflow task is your deliberate act; not starting
+  is a choice, not a silent failure — the visibility guarantees apply once a task is engaged.
+- **Honest reliability model:** *deterministic* = detect/show the marker, deliver guidance text, write
+  docs. *Model-mediated* (each can fail independently, so each needs its own visible signal or an
+  honest "not done") = advance-on-settle, fire the challenger, assemble correct context, and
+  act-on-guidance — this last has no signal of its own; it surfaces only via the challenge on the
+  builder's output (the weakest link).
+- **Proof-of-success (how we'll know M2 worked):** every model-mediated failure is visible and
+  hand-recoverable — shown on a real task with a **planted flaw only an `OPERATOR.md`-fed challenger
+  could catch** (plus a without-context control confirming the catch disappears), the challenger's
+  *written output* getting the credit; the marker's **transitions** (start → advance → reset), not
+  just a snapshot, working from a fresh chat; each event forced to fail to confirm the status honestly
+  reads "not done" (never a false "it ran"); raw firing rate **made visible, not measured to a
+  threshold,** on **natural** tasks as a secondary "how often you'd step in" signal. **M2 de-risks:** (a) the per-task marker lifecycle,
+  (b) auto-firing with verified-correct context, and (c) whether the platform allows a **deterministic,
+  un-forgeable capture** of what a subagent ran on (else receipts collapse to self-report). **M2 is now complete (2026-07-14 — see the top status entry).** Step 3
+  (Architecture) settled 2026-07-14 (see DECISIONS + the "Workflow machinery" section in
+  ARCHITECTURE): one `workflow.py` script is the by-convention sole author of every signal, with a
+  per-task marker, two read-only hooks, and a status line, all isolated in a test project — and the
+  challenge-ran light is now honest-**self-reported permanently** (cruxes (b)/(c) resolved by
+  reasoning: a true "verified" is unreachable while the model spawns the challenger, so the spike
+  tests only that the canary catches a wrong-context run).
+
 **2026-07-13** — Piloting the six-step adversarial workflow by hand (`docs/WORKFLOW.md`, M1) on its
 first real task: a new **`sync.py status`** command. Working through Step 1 (Need) reshaped what the
 command should be:

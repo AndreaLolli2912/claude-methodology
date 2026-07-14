@@ -61,3 +61,41 @@ probe: a fresh clone stamps files at clone time, and a pull that updates a file 
 it truly knows, and writes nothing (assert that in a throwaway run).
 **Pointers:** `sync.py` (`status` + `_git_status`/`_live_status`), `DECISIONS.md` 2026-07-13 (the
 mtime experiment) (2026-07).
+
+## Run an adversarial AI-reviewer pass without fooling yourself
+**When you need this:** you're using a separate AI subagent to attack a proposal, design, or code (a
+"challenger"), and you want its verdict to actually mean something.
+**The path:**
+1) **Ask for the FULL ranked list, not the single worst thing.** A "give me your top finding" prompt
+   hides coverage — in M2 a context-fed reviewer reported one flaw and stayed quiet on others it had
+   silently dismissed. Ask for everything, each tagged blocking / material / minor; let only
+   blocking+material drive another round, so "list everything" doesn't become an incentive to pad.
+2) **Read cold first, then with context.** Context sharpens *and* anchors: handed the domain facts, a
+   reviewer catches domain-specific flaws but can call a self-contradictory proposal "coherent". Do a
+   cold pass (artifact + docs only) before the context-fed pass — same agent, in that order.
+3) **Let it attack settled decisions, and defend them from the written record.** A decision nobody
+   re-questioned isn't proven. If you can't defend it from the docs, the docs were incomplete (write the
+   missing reason down); if you can, it's re-proven cheaply. The *human* rules on reopen, and caps it
+   (one round, one hop) so it can't cascade forever — and the attacker, biased toward reopening, never
+   referees whether its own attack landed.
+4) **Turn the attacker on its own conclusions.** A quick, cheap pass attacking the reviewer's *proposed
+   fixes* found better/cheaper alternatives and a convergence trap in M2.
+**How you know it worked:** the review changes a real decision on evidence (not vibes), and a later
+fresh reader can see *why* from the docs alone.
+**Pointers:** `docs/WORKFLOW.md` challenger rules 3/5/6, `docs/DECISIONS.md` 2026-07-14 (M2) (2026-07).
+
+## Verify a hook/integration's contract against the real system, not just your unit test
+**When you need this:** you wrote a script a host system invokes on a fixed input/output contract (a
+Claude Code hook, a webhook, a plugin callback), and your tests feed it an *assumed* payload shape.
+**The trap:** the test passes because it uses the shape *you guessed*, but the host sends a different
+one — so the thing is silently inert in production while every test is green. In M2 a hook printed bare
+text to inject context, but Claude Code requires a `{"additionalContext": ...}` JSON object; the unit
+test (which only checked "something was printed") passed, and it would have done nothing live.
+**The path:**
+1) Look up the host's actual payload/return contract in its docs *before* trusting the tests.
+2) Make the test assert the real output *format*, not just presence.
+3) Where the contract can only be confirmed live, say so and keep a short live smoke-test as an explicit
+   gate.
+**How you know it worked:** the test would fail if the output format were wrong, and a live smoke-test
+confirms the host actually invokes and honors it.
+**Pointers:** `docs/DECISIONS.md` 2026-07-14 (M2 nudge-hook bug) (2026-07).

@@ -3,6 +3,137 @@
 > Why things are the way they are. Add a dated entry whenever a task finishes or a plan is
 > executed (newest first). Keep each entry short: what changed and why.
 
+### 2026-07-14 — Workflow machinery: M2 judged (go, with conditions) and shipped (Steps 5–6)
+Ran the last two steps of the M2 dogfood. **Built** the throwaway de-risk spike — an isolated test
+project holding `workflow.py` + a per-task marker + two read-only hooks + a status line, all wired by
+its *own* project-scoped `.claude/settings.json` so the live `~/.claude` was never touched — then put
+it through **Judgment (Step 5)** and **Shipping (Step 6)**.
+
+Evidence (all gathered off-session):
+- **Deterministic chain: proven, no false-green.** 28 automated checks cover the marker lifecycle, the
+  advance-gate (refuses on *missing* and on *stale*), fail-closed `record` (missing result / wrong
+  canary / unreadable artifact each write no receipt), raw-byte hashing (a one-byte edit flips
+  fresh→stale), and `advance --force` recording an honest "missing (overridden)". A fidelity attacker
+  found no path that writes a green receipt on bad input.
+- **Context delivery is load-bearing.** A with/without-context control (two runs per arm) showed the
+  operator-specific catch appears only when the machinery hands the challenger `OPERATOR.md`. It did
+  *not* flip the gate outcome — realistic proposals carry other generic flaws a cold reader also
+  blocks on — which is an honest limit, logged rather than hidden.
+- **Payload schemas verified against the docs**, which caught a real bug: the nudge hook printed bare
+  text instead of the `additionalContext` JSON Claude Code requires, so it would have been silently
+  inert live while unit tests stayed green. Fixed; the test now asserts the injection *format*.
+
+**Verdict: go to M3, with conditions.** The deterministic core clears its bar; the reframed bar
+("every model-mediated failure is *visible*") is proven off-session but its live half is still owed, so
+M3 is gated on a **live smoke-test** — hooks + status line actually fire in a real session, and marker
+transitions read from a fresh chat. Firing is model-mediated (~70–80%, unforceable) by design; the
+machinery makes a miss visible, not impossible.
+
+**Theory improvements this dogfood surfaced** (folded into `WORKFLOW.md` challenger rules, and inputs
+to building the real challenger at M3): rule 3 — a challenger may attack *any relevant* decision,
+including settled ones, defended from the written record, with the **human** ruling on reopen and
+reopening **capped** to one round / one hop so it can't cascade endlessly; rule 5 — return the **full
+findings list tagged blocking / material / minor**, only blocking+material extend a round; rule 6 —
+read in **two passes, cold then warm**, because context sharpens but also anchors. These were
+themselves found by turning a fast-model attacker on the proposed changes, which improved all three and
+caught the cascade trap. Also fixed an honest-accounting gap the Judgment attacker flagged: the
+OVERVIEW proof-of-success said firing rate would be "measured"; that was renegotiated at Design to
+"made visible, not measured", and OVERVIEW now matches so no stated bar is silently unmet. The spike
+code stays in the scratchpad (throwaway, never bundled under `claude/`); this entry plus the
+ARCHITECTURE "Workflow machinery" section are its durable write-up (T1).
+
+### 2026-07-14 — Workflow machinery: structure settled (M2 Step 3, Architecture)
+Third step of the M2 dogfood. Settled the internal structure and the boundaries between parts after
+one moderate challenger round plus a confirming pass (both light, per rule 7 — the hard calls were
+made at Design). Written in full into `ARCHITECTURE.md` ("Workflow machinery" section); the shape and
+the decisions that moved:
+- **The map:** one `workflow.py` (a command-line tool *and* an importable library) is the spine and
+  the by-convention sole author of every truth signal; a per-task `.workflow/marker.json` it owns; one
+  *adaptable* challenger agent (`claude/agents/*.md`, a net-new dir); two read-only, non-blocking hooks
+  (a self-silencing `UserPromptSubmit` nudge, a `PreToolUse` human-confirm skip-warner); the status
+  line extended to show step + receipt state; a few conductor lines in the project `CLAUDE.md`. All of
+  it isolated in a throwaway test project's own `.claude/settings.json` — confirmed against the docs
+  that `statusLine` and `hooks` are honored at project scope, so the live `~/.claude` is never touched.
+- **Six verbs:** `start` (human bootstrap; refuses if a task is already open), `prepare` (assemble the
+  context bundle + plant a canary), `record` (check the echo, hash the artifact, write the receipt —
+  fail-closed: any failed check writes *no* receipt, exits non-zero, stays visible), `advance` (the
+  gate; `advance --force` is a *recorded* human override), `status` (+ the one shared
+  fresh/stale/missing function the status line and hooks import), `reset`.
+- **Two Design-era cruxes closed here.** Crux (c), the receipt-authorship boundary: **accept-and-
+  document, do not enforce** — "sole author" is a convention (the model *can* write those files); we
+  accept it because the guarded failure is *omission* (forget to fire → no receipt → visible), and
+  faking a receipt on a single-user tool serves no one. And the challenger caught a real clash between
+  two settled things — Design's "advance is gated" vs the Need's "warn, never block": resolved with
+  `advance --force` recording a visible override, so the gate stops *accidental* skips while the human
+  keeps the wheel.
+- **Honest ceiling made permanent (crux (b), resolved by reasoning — no experiment needed):** because
+  the *model* spawns the challenger, it can read the canary and echo it itself, so the challenge-ran
+  light is self-reported *forever*, never "verified." The canary is kept but demoted — it catches an
+  *honest* wrong-context mistake (wrong/truncated bundle → echo fails → no receipt → reads "missing").
+  This shrinks Step 4: it no longer chases "reach verified," only "does the canary catch a
+  wrong-context run."
+- **One adaptable challenger** (not one file per step) for the spike — the rules are constant, the
+  per-step specifics come from the bundle. Does not prejudge the eventual real system.
+- **Honestly deferred (recorded, not solved):** region-hashing inside shared append-logs (the spike's
+  hash-gate is valid only for *single-file* artifacts; M3 designs anchoring); backward/regression
+  movement (the spike won't exercise it); the `sync.py` directory-copy change for M6 (to be logged in
+  RISKS at Shipping).
+The confirming pass caught three faithfulness bugs in the *write-up* (a false "logged in RISKS"
+pointer; the accept-and-document boundary not actually written down; a "stale" that should read
+"missing") — all fixed before settling. Next: Step 4 (Implementation) — build the throwaway spike one
+tested block at a time in an isolated test project, then run the experiment (deterministic chain works
+every time; the canary reliably catches a wrong-context run).
+
+### 2026-07-14 — Workflow machinery: firing strategy settled (M2 Step 2, Design)
+Second step of the M2 dogfood (building the six-step workflow's own machinery; the settled Need is in
+`OVERVIEW`). Settled the **firing strategy** after two challenger rounds + a confirming pass. Core
+decision: a **deterministic `workflow` script — not the model — is the single independent author of
+every verifying signal**, so the model still does the probabilistic acts (spawn the challenger, draft
+artifacts) but never vouches for itself. This replaced a first draft where the model authored both an
+action *and* its own status — which can only surface crude failures (missing/corrupt), never a
+confident mistake (wrong-step advance, wrong-context challenge); the challenger showed that defeats the
+Need's "every failure visible" guarantee.
+
+The design:
+- **State:** one gitignored, ephemeral per-task marker file — task id, current step, draft/settled, and
+  a per-step receipt {challenge-ran, context-hash, artifact-hash}. Committed docs stay the cross-task
+  memory; the marker is only the live task's state (absent = machinery inert here).
+- **Two genuinely-deterministic guarantees** (confirmed solid by the confirming pass): the
+  "challenge-ran" light is keyed to the artifact's **content-hash** and the status line hashes the
+  *live* artifact directly, so any revision flips it to `stale` (no stale-green); and **advance is
+  gated** — the script refuses the next step without a fresh receipt matching the current artifact, and
+  even a direct-write bypass shows `MISSING` on the new step. Wrong/premature advance and stale-green
+  are both caught.
+- **Context correctness — honest floor + an upgrade to test.** Hashing the context *bundle* only proves
+  the file is intact (which the script already knew) and the hash is couriered back by the model — so
+  it is *not* proof the challenger consumed the right context. Decision (with the user): design the
+  **honest floor** — label the context light *self-reported* (`chal:ok(self)`), never a false
+  "verified" (the Need forbids a false "verified" but allows an honest "not sure"). The **upgrade** to
+  attempt in the experiment: embed a fresh secret **canary token inside the bundle** that the
+  challenger can only echo back if it truly read the content (real proof of *consumption*), earning
+  "verified" only if that echo can also reach the script through a channel the model can't fake.
+- **Nudge:** a `UserPromptSubmit` hook injects "a challenge is owed" **only when one actually is**
+  (draft step, no fresh receipt) — self-silencing, not every-turn (every-turn cries wolf and gets tuned
+  out).
+- **Skip-warner:** a `PreToolUse` hook using `permissionDecision:"ask"` — a **human confirm**, never a
+  block or a model-only whisper (matches "warn, human consciously clears"). Must distinguish *code*
+  writes from *doc/artifact* writes so it doesn't fire when the builder writes its own design doc.
+- **Entry:** natural-language bootstrap; the status line lighting up is the confirmation it took.
+- **Dropped** the `SubagentStop` hook — open Claude Code bug #7881 means it can't reliably say which
+  subagent finished or see its input, so it added nothing once we stopped trusting it.
+
+What Step 4's experiment must de-risk (the cruxes the rounds surfaced): **(a)** the marker lifecycle
+start→advance→reset from a *fresh chat*, each transition force-failed to confirm it honestly reads "not
+done" — including that a *wrong* advance is detectable; **(b)** context *consumption* via the
+canary-echo (a wrong/truncated-context run must read `stale`/`MISSING`, never `ok`), and whether that
+echo can reach the script un-forgeably — else keep the honest self-reported label; **(c)** the
+receipt/marker **authorship boundary** — "script is sole author" is a *convention* (the model *can*
+write those files directly), sound under the omission threat model (forget to fire → visible) but not
+enforced; decide at Architecture whether to enforce/tamper-detect or accept-and-document. Effort note:
+ran Design lighter than Need (2 rounds + a confirming pass vs Need's 3), per challenger rule 7. Next:
+Step 3 (Architecture) — marker/receipt file layout, the `workflow` script's verbs, and the
+authorship-boundary decision.
+
 ### 2026-07-13 — `sync.py status` built & verified (Steps 2–5 of the pilot)
 Implemented the report-only `status` command: a git check (uncommitted / ahead / behind / diverged,
 via a timeout-capped `git fetch` that degrades to "couldn't reach GitHub" when offline) plus a

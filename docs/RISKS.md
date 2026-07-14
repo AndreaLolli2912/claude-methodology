@@ -12,6 +12,8 @@
 | 5 | **Root `CLAUDE.md` is gitignored** → not synced; a fresh clone won't have it, and its content only exists on the machine that created it. | Low | Accepted (by design) |
 | 6 | **Transport now requires Python 3.** A machine without Python can't install/capture. | Low | Accepted — user runs Python everywhere; stdlib-only |
 | 7 | **Status line isn't auto-wired on a new machine.** `install` deploys `statusline.py`, but the `statusLine` block that points at it lives in the personal (un-bundled) `settings.json` and names this machine's Python path. | Low | Resolved — `sync.py enable-statusline` wires each machine's own interpreter |
+| 8 | **`sync.py` copies file-by-file.** Deploying the workflow machinery (M6) means shipping whole `agents/`/`hooks/` directories, which the per-file `MANIFEST` can't express. | Low | Accepted — deferred to M6 |
+| 9 | **Workflow-machinery firing is model-mediated (~70–80%) and its live layer is unproven.** The deterministic parts are reliable, but the model *spawning the challenger* is a probabilistic act, and the M2 spike proved only the off-session half. | Medium | Accepted/mitigated — machinery makes a miss *visible*; go-to-M3 gated on a live smoke-test |
 
 ## Detail
 
@@ -54,3 +56,15 @@ is added, and the block hardcodes this box's interpreter (`…/anaconda3/python.
 differs per machine. *Fixed:* `sync.py enable-statusline` (and `disable-statusline`) writes the
 `statusLine` block using `sys.executable`, mirroring `enable-hook`, so each machine wires its own
 interpreter with one command. Run it once after `install` on a new box.
+
+**#8 — Directory-copy for the machinery (deferred).** `sync.py`'s `MANIFEST` lists individual files;
+the workflow machinery (M6) adds whole `claude/agents/` and `claude/hooks/` trees. Shipping those needs
+a small directory-copy capability in `sync.py`. Not an M2 problem — recorded so M6 handles it.
+
+**#9 — Model-mediated firing + unproven live layer (accepted, mitigated).** The deterministic parts
+(detect the marker, show it, gate the advance, warn on skip) are ~100% reliable, but getting the model
+to *spawn the challenger on its own* is a model decision (~70–80%; a hook cannot force it). The M2 spike
+proved the deterministic chain and the context-delivery value off-session; it did **not** prove the
+hooks/status line fire in a live session or the real unprompted firing rate. Mitigation is by design:
+the machinery makes a miss **visible and hand-recoverable** (no receipt → the step reads "not done"),
+not impossible. Go-to-M3 is gated on a live smoke-test that closes the live gap.
