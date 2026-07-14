@@ -1,0 +1,198 @@
+#!/usr/bin/env python3
+"""Direct-invocation test for the hardened workflow.py (M3 Need slice).
+
+Proves the deterministic chain by running the REAL CLI as a subprocess - exactly how
+Claude Code / the developer would call it - and checking exit codes + resulting state
+after each move. It also imports the shared receipt_state() to confirm the status line
+and hooks (M5) would see the same truth.
+
+It deploys the bundle the way it actually ships: copy workflow.py + rulebook.md together
+into a fresh temp project, so the test exercises the COPIED shape, not the repo source.
+"""
+import subprocess
+import sys
+import shutil
+import tempfile
+from pathlib import Path
+
+SRC = Path(__file__).resolve().parents[2] / "claude" / "workflow"
+TMP = Path(tempfile.mkdtemp(prefix="wf_test_"))
+
+shutil.copy(SRC / "workflow.py", TMP / "workflow.py")
+shutil.copy(SRC / "rulebook.md", TMP / "rulebook.md")
+(TMP / "docs").mkdir()
+
+sys.path.insert(0, str(TMP))
+import workflow  # noqa: E402  (import after path insert + copy: ROOT resolves to TMP)
+
+WF = TMP / ".workflow"
+NEED = TMP / "docs" / "draft-need.md"          # the step's draft = artifact_path("need")
+OPERATOR = TMP / "docs" / "OPERATOR.md"
+RULEBOOK = TMP / "rulebook.md"
+CONTEXT = WF / "context.md"
+CHALLENGE = WF / "challenge.md"
+
+checks = []
+
+
+def check(name, cond):
+    checks.append((name, bool(cond)))
+    print(("PASS " if cond else "FAIL ") + name)
+
+
+def run(*args):
+    p = subprocess.run([sys.executable, str(TMP / "workflow.py"), *args],
+                       capture_output=True, text=True)
+    return p.returncode, p.stdout, p.stderr
+
+
+def canary_in_context():
+    text = CONTEXT.read_text(encoding="utf-8")
+    for line in text.splitlines():
+        if "CANARY (echo this token" in line:
+            return line.split(":", 1)[1].strip()
+    return None
+
+
+def write_challenge(canary):
+    CHALLENGE.write_text("## COLD verdict\nAttacked it. token: {}\n\n## WARM verdict\nok\n".format(canary),
+                         encoding="utf-8")
+
+
+def write_need(body="the toy need under attack."):
+    NEED.write_text("# Need draft\nNEED-DRAFT-MARKER: {}\n".format(body), encoding="utf-8")
+
+
+# A. status with no task -> inert, exit 0
+rc, out, _ = run("status")
+check("A no-task status is inert, exit 0", rc == 0 and "no task open" in out)
+
+# B. start -> exit 0, marker at need
+rc, out, _ = run("start", "Toy need task")
+check("B start succeeds at step need", rc == 0 and workflow.load_marker()["current_step"] == "need")
+
+# C. start again -> refuse to clobber
+rc, _, err = run("start", "Another")
+check("C second start refuses (no clobber)", rc == 1 and "already open" in err)
+
+# UNIT. an unknown recipe source token raises loudly (the guard is real, not just a comment)
+raised = False
+try:
+    workflow._resolve_sources(["bogus_token"], "need")
+except KeyError:
+    raised = True
+check("U _resolve_sources raises on an unknown token", raised)
+
+# PRE-1. prepare with NO draft present -> fail closed (can't challenge nothing)
+OPERATOR.write_text("# Operator\nOPERATOR-MARKER: how the developer actually works.\n", encoding="utf-8")
+rc, _, err = run("prepare", "need")
+check("P1 prepare refuses when the draft is missing", rc == 1 and "no proposal" in err.lower())
+
+# PRE-2. prepare with NO rulebook -> fail closed (A-1 guarantee: rules must be present)
+write_need()
+RULEBOOK.unlink()
+rc, _, err = run("prepare", "need")
+check("P2 prepare refuses when the rulebook is missing (A-1)", rc == 1 and "rulebook" in err.lower())
+shutil.copy(SRC / "rulebook.md", RULEBOOK)   # restore
+
+# D. advance with no receipt -> gate refuses, still at need
+rc, _, err = run("advance")
+check("D gate refuses advance without receipt", rc == 1 and workflow.load_marker()["current_step"] == "need")
+
+# E. prepare builds the alpha-1 bundle (rulebook header + ordered COLD/WARM + canary)
+rc, out, _ = run("prepare", "need")
+c1 = canary_in_context()
+ctx = CONTEXT.read_text(encoding="utf-8")
+header_first = "The challenger's rulebook" in ctx and ctx.index("The challenger's rulebook") < ctx.index("# Challenge for step")
+i_cold = ctx.find("===== COLD")
+i_artifact = ctx.find("NEED-DRAFT-MARKER")
+i_canary = ctx.find("CANARY (echo")
+i_warm = ctx.find("===== WARM")
+i_operator = ctx.find("OPERATOR-MARKER")
+ordered = -1 < i_cold < i_artifact < i_canary < i_warm < i_operator
+check("E prepare plants canary + sets pending",
+      rc == 0 and c1 and workflow.load_marker()["pending"]["canary"] == c1)
+check("E bundle carries the rulebook as a framing header (A-1)", header_first)
+check("E bundle is ordered COLD(artifact+canary) -> WARM(operator) (alpha-1)", ordered)
+
+# F. record with NO challenge file -> fail closed, no receipt
+rc, _, err = run("record", "need")
+check("F record fail-closed on missing result",
+      rc == 1 and "no receipt written" in err.lower() and "need" not in workflow.load_marker().get("receipts", {}))
+
+# G. result echoes WRONG canary -> fail closed
+write_challenge("WF-CANARY-deadbeefdeadbeef")
+rc, _, err = run("record", "need")
+check("G record fail-closed on wrong canary",
+      rc == 1 and "canary" in err.lower() and "need" not in workflow.load_marker().get("receipts", {}))
+
+# H. correct canary BUT artifact missing -> fail closed (unreadable artifact)
+write_challenge(c1)
+NEED.unlink()
+rc, _, err = run("record", "need")
+check("H record fail-closed on unreadable artifact",
+      rc == 1 and "unreadable" in err.lower() and "need" not in workflow.load_marker().get("receipts", {}))
+
+# I. recreate the SAME artifact; correct canary -> success (live hash matches prepare snapshot)
+write_need()
+rc, out, _ = run("record", "need")
+check("I record succeeds with artifact + correct canary",
+      rc == 0 and workflow.load_marker()["receipts"]["need"]["challenge_ran"] is True)
+
+# J. shared truth function agrees: fresh
+check("J receipt_state(need) == fresh", workflow.receipt_state("need") == "fresh")
+
+# K-N. multi-round: a revision stales the receipt and BLOCKS advance until re-challenged (proof #1),
+#      and the TOCTOU guard refuses a record whose artifact changed after prepare.
+write_need("REVISED between rounds.")
+check("K a revision flips fresh -> stale", workflow.receipt_state("need") == "stale")
+
+rc, _, err = run("advance")
+check("L gate BLOCKS advance while stale",
+      rc == 1 and workflow.load_marker()["current_step"] == "need")
+
+rc, _, _ = run("prepare", "need")                 # round 2: snapshot the revised draft
+c2 = canary_in_context()
+write_challenge(c2)
+write_need("CHANGED AGAIN after prepare.")        # edit AFTER prepare, BEFORE record
+rc, _, err = run("record", "need")
+check("M TOCTOU: record refuses when the draft changed after prepare",
+      rc == 1 and "changed between prepare and record" in err.lower()
+      and workflow.receipt_state("need") == "stale")
+
+rc, _, _ = run("prepare", "need")                 # honest re-challenge over the current bytes
+c3 = canary_in_context()
+check("M2 re-prepare mints a fresh canary each round", c3 and c3 not in (c1, c2))
+write_challenge(c3)
+rc, _, _ = run("record", "need")
+check("M3 re-record makes it fresh again", workflow.receipt_state("need") == "fresh")
+
+rc, out, _ = run("advance")
+check("N gate OPENS on the fresh re-challenge (need -> design)",
+      rc == 0 and workflow.load_marker()["current_step"] == "design")
+
+# O. force-advancing a never-challenged step records the override AND reads honestly 'missing'
+rc, out, _ = run("advance", "--force")            # design (no recipe/receipt) -> architecture
+m = workflow.load_marker()
+check("O --force records the override + moves on (design -> architecture)",
+      rc == 0 and m["current_step"] == "architecture" and m["receipts"]["design"].get("override") is True)
+check("O2 overridden-never-challenged step reads 'missing', not 'stale'",
+      workflow.receipt_state("design") == "missing")
+
+# P. reset clears state -> inert again
+rc, _, _ = run("reset")
+check("P reset clears state", rc == 0 and workflow.load_marker() is None)
+
+# Q. a non-ASCII title does not crash start/status (Windows cp1252 arrow), and start is consistent
+rc, out, _ = run("start", "Need → Design workflow")
+started_ok = rc == 0 and workflow.load_marker() is not None and "→" in workflow.load_marker()["task_title"]
+rc2, _, _ = run("status")
+check("Q non-ASCII title: start exits 0 and status does not crash", started_ok and rc2 == 0)
+run("reset")
+
+shutil.rmtree(TMP, ignore_errors=True)
+
+passed = sum(1 for _, ok in checks if ok)
+total = len(checks)
+print("\n{}/{} checks passed.".format(passed, total))
+sys.exit(0 if passed == total else 1)

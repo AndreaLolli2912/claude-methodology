@@ -1,0 +1,89 @@
+#!/usr/bin/env python3
+"""End-to-end DETERMINISTIC chain for the Need slice (proof #1, minus the model).
+
+Drives the whole loop the conductor describes - start -> prepare -> (challenger writes
+a result) -> record -> publish -> advance - as one continuous flow, standing in for the
+challenger by writing a result file that echoes the planted canary. This proves the parts
+that must "work every time": a step that really settles through the gate gets its receipt
+AND its OVERVIEW auto-doc, in one run. (The model-mediated parts - actually spawning the
+challenger, the warm pass - are exercised in the live e2e run, not here.)
+"""
+import subprocess
+import sys
+import shutil
+import tempfile
+from pathlib import Path
+
+SRC = Path(__file__).resolve().parents[2] / "claude" / "workflow"
+TMP = Path(tempfile.mkdtemp(prefix="wf_flow_"))
+shutil.copy(SRC / "workflow.py", TMP / "workflow.py")
+shutil.copy(SRC / "rulebook.md", TMP / "rulebook.md")
+(TMP / "docs").mkdir()
+
+sys.path.insert(0, str(TMP))
+import workflow  # noqa: E402
+
+WF = TMP / ".workflow"
+NEED = TMP / "docs" / "draft-need.md"
+OVERVIEW = TMP / "docs" / "OVERVIEW.md"
+CONTEXT = WF / "context.md"
+CHALLENGE = WF / "challenge.md"
+ENTRY = WF / "overview-entry.md"
+
+checks = []
+
+
+def check(name, cond):
+    checks.append((name, bool(cond)))
+    print(("PASS " if cond else "FAIL ") + name)
+
+
+def run(*args):
+    p = subprocess.run([sys.executable, str(TMP / "workflow.py"), *args],
+                       capture_output=True, text=True)
+    return p.returncode, p.stdout, p.stderr
+
+
+def canary():
+    for line in CONTEXT.read_text(encoding="utf-8").splitlines():
+        if "CANARY (echo this token" in line:
+            return line.split(":", 1)[1].strip()
+    return None
+
+
+# Scaffold a minimal OVERVIEW with the anchor the publish half targets.
+OVERVIEW.write_text("# Overview\n\n## Current status\n\n**2026-01-01** - seed entry.\n", encoding="utf-8")
+
+# 1) start -> 2) draft -> 3) prepare -> 4) challenger writes result -> 5) record
+run("start", "End-to-end need")
+NEED.write_text("# Need\nThe toy need, drafted for the flow test.\n", encoding="utf-8")
+run("prepare", "need")
+CHALLENGE.write_text("## COLD verdict\nlooks ok. canary: {}\n\n## WARM verdict\nok\n".format(canary()),
+                     encoding="utf-8")
+rc, _, _ = run("record", "need")
+check("1 record writes a fresh receipt after a real prepare->challenge", rc == 0 and workflow.receipt_state("need") == "fresh")
+
+# 6) publish the settled prose into OVERVIEW
+ENTRY.write_text("**2026-07-14** - Need settled: the machinery must prove the pattern end to end.\n",
+                 encoding="utf-8")
+rc, _, _ = run("publish", "need")
+doc = OVERVIEW.read_text(encoding="utf-8")
+check("2 publish auto-docs the settled Need into OVERVIEW under the anchor",
+      rc == 0 and "Need settled: the machinery" in doc
+      and doc.index("<!-- WF:need:start") > doc.index("## Current status")
+      and doc.index("<!-- WF:need:start") < doc.index("seed entry"))
+
+# 7) advance - the gate opens because the receipt is fresh
+rc, _, _ = run("advance")
+check("3 advance opens on the fresh receipt (need -> design)", rc == 0 and workflow.load_marker()["current_step"] == "design")
+
+# The whole chain settled one step end to end with both outputs (receipt + auto-doc).
+check("4 both outputs present: fresh receipt recorded AND the OVERVIEW block written",
+      "need" in workflow.load_marker().get("receipts", {}) and OVERVIEW.read_text(encoding="utf-8").count("<!-- WF:need:start") == 1)
+
+shutil.rmtree(TMP, ignore_errors=True)
+
+passed = sum(1 for _, ok in checks if ok)
+total = len(checks)
+print("\n{}/{} checks passed.".format(passed, total))
+sys.exit(0 if passed == total else 1)

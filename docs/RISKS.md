@@ -14,6 +14,9 @@
 | 7 | **Status line isn't auto-wired on a new machine.** `install` deploys `statusline.py`, but the `statusLine` block that points at it lives in the personal (un-bundled) `settings.json` and names this machine's Python path. | Low | Resolved — `sync.py enable-statusline` wires each machine's own interpreter |
 | 8 | **`sync.py` copies file-by-file.** Deploying the workflow machinery (M6) means shipping whole `agents/`/`hooks/` directories, which the per-file `MANIFEST` can't express. | Low | Accepted — deferred to M6 |
 | 9 | **Workflow-machinery firing is model-mediated (~70–80%).** The deterministic + live layers are now proven; the residual is that the model *spawning the challenger* is a probabilistic act a hook cannot force. | Medium | Accepted/mitigated — live layer **proven** (smoke-test passed); a miss is made *visible*, not prevented |
+| 10 | **`publish` newline handling assumes a consistent-newline doc.** A doc mixing LF and CRLF is homogenized to its dominant ending on write. | Low | Accepted for M3 (real `OVERVIEW` is pure-LF); revisit at real-system |
+| 11 | **`publish` has no compare-and-swap.** A concurrent external edit in the read→write window is lost; two concurrent mutating runs race on the atomic replace. | Low | Accepted for M3 (sequential single-user CLI); an **M5 tripwire** once a hook can auto-fire `publish` |
+| 12 | **Sentinel matching is code-fence-blind and key-specific.** A column-0 sentinel line inside a ``` fence would match; an entry carrying a *different* step's sentinel line passes the guard. | Low | Accepted for M3 (single-writer `OVERVIEW`, no such lines); an **M4** item when `OVERVIEW` goes multi-writer |
 
 ## Detail
 
@@ -70,3 +73,26 @@ line fire in a real session, and it caught and fixed a nudge that was silently i
 format). So the deterministic *and* live layers are now proven; the only residual is the model's own
 choice to spawn the challenger. A secondary observed limit: the skip-warner's confirmation *reason
 text* doesn't surface in the dialog (a generic prompt) — an M3 refinement, logged not solved.
+
+**#10 — publish newline homogenization (M3-safe).** `publish` detects a doc's dominant newline (`\r\n` if
+any CRLF is present, else `\n`) and re-applies it to the whole file on write. A *consistently* LF or CRLF
+doc round-trips byte-clean (proven both directions in `test_publish.py`); a *mixed* doc gets homogenized to
+the dominant ending — a noisy whole-file diff, though never corruption (git recovers). The real
+`OVERVIEW.md` is pure-LF, so this can't bite today. *Fix at real-system:* splice into the raw string without
+a global newline pass, or normalize the doc deliberately.
+
+**#11 — publish has no compare-and-swap (M5 tripwire).** `publish` reads the target once, splices, and
+atomically replaces — with no mtime/hash check that the doc is unchanged since the read. In M3's sequential,
+single-user CLI there is no concurrent writer, so the window is inert; the atomic write also guarantees the
+target is never left torn. It graduates to a real risk at **M5**, when a hook could auto-fire `publish`
+while an editor holds the doc open (a lost edit), or two invocations race on `os.replace` (the loser
+raises — now cleaned up, but still surfaced). *Fix when M5 lands:* a hash compare-and-swap (refuse if the
+doc changed since the read), or a lock.
+
+**#12 — sentinel matching is code-fence-blind + key-specific (M4).** A sentinel is recognized as a
+**column-0** comment line, which correctly ignores inline mentions and indented examples — but a column-0
+sentinel line standing alone *inside a ``` code fence* would still match, and the entry-guard only rejects
+the *current* step's key (an entry carrying another step's `WF:<other>:` line passes through). Both are
+inert in M3 (a fresh `init-project-docs` `OVERVIEW` has neither, and only `need` publishes), but they become
+live when **M4** makes `OVERVIEW` a multi-writer doc. *Fix at M4:* a fence-aware parse and a key-agnostic
+entry guard, alongside region-anchoring.

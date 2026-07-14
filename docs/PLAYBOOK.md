@@ -113,3 +113,31 @@ happily pass through several wrong fixes in a row.
 the host actually invoking and honoring it — with the hook isolated so nothing else could have caused
 the effect.
 **Pointers:** `docs/DECISIONS.md` 2026-07-14 (M2 live smoke-test + nudge-hook bug) (2026-07).
+
+## Edit part of a text file without a surprise whole-file diff (and don't get version-pinned)
+**When you need this:** a tool edits *part* of a committed text file (insert a block, replace a region) and
+must leave the rest byte-for-byte unchanged — no phantom diff — on Windows *and* macOS/Linux, across Python
+versions.
+**The trap:** `Path.read_text()`/`write_text()` do universal-newline translation. Read text on Windows and
+every `\r\n` becomes `\n` in memory; write it back and every `\n` becomes the platform separator (`\r\n`) —
+for the WHOLE file, not just your edit. A one-line change then silently rewrites every line ending, burying
+the real diff and defeating "the human reviews the diff before committing." And the obvious fix,
+`read_text(newline="")`, only exists in Python **3.13+** (`write_text(newline=)` is 3.10+) — so it *crashes*
+on 3.12. A green test on the author's box can hide both bugs at once, if the test seeds its fixture through
+the same translating call it's testing.
+**The path:**
+1) Do the file I/O in **raw bytes**: `raw = path.read_bytes().decode("utf-8")`; write with
+   `path.write_bytes(text.encode("utf-8"))`. No `newline=` kwarg anywhere → no version pin.
+2) Detect the doc's newline once (`"\r\n" if "\r\n" in raw else "\n"`), do all matching/splicing in **LF
+   space**, then re-apply that newline before writing — untouched regions keep their exact bytes and the
+   inserted block matches the doc's style.
+3) **Run the tests on the actual target interpreter**, and seed fixtures from raw bytes
+   (`write_bytes(b"...\n...")`), not through the translating call under test — else the fixture is already
+   "wrong" and the bug is invisible. Assert *both* directions: an LF doc stays LF, a CRLF doc stays CRLF.
+**Gotchas:** hash raw bytes too (a text-mode hash disagrees with a byte-mode one across platforms). Match
+structural markers as **whole lines at column 0** (exactly what you write), never as substrings, so prose
+that merely mentions the marker syntax can't be miscounted into an overwrite.
+**How you know it worked:** a partial edit changes only its own region's bytes; a pure-LF file stays pure-LF
+and a pure-CRLF file stays pure-CRLF — proven on the real interpreter, both directions.
+**Pointers:** `claude/workflow/workflow.py` (`_atomic_write_text`, `cmd_publish`),
+`tests/workflow/test_publish.py` (LF+CRLF checks) (2026-07).

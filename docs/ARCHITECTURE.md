@@ -236,3 +236,13 @@ never touched; **no workflow hooks** in M3 (nudge/skip-warner are M5).
 **Deferred from the Need slice:** publish-half enrichment, the four remaining review-style rows, Step 4's
 built-in-tool team, the research helper, forcing the cold read (α-2) → **M4**; the ambient surface (status
 line, nudge, skip-warner) → **M5**.
+
+**Built (2026-07-14).** The structure above is implemented (`claude/workflow/workflow.py` + `rulebook.md`
++ `conductor.md`, `claude/agents/challenger.md`) and proven end to end — see DECISIONS (2026-07-14). Two
+build-time refinements from the Step-4 red-team, both faithful to the settled contracts: (a) the step draft
+lives at `docs/draft-<step>.md`, not `docs/<step>.md` — a bare `docs/architecture.md` collides with the real
+`ARCHITECTURE.md` on a case-insensitive filesystem, so every review-style step's draft is collision-proof
+(keeps proof #4 honest); (b) `publish` and all doc I/O use **raw bytes** to preserve a doc's exact newlines
+(and to avoid `read_text(newline=)`, which is Python 3.13+ while the developer runs 3.12). Harness tooling:
+`tools/wf_drift_guard.py` byte-compares the repo→test-project copy before each run. Residual
+real-system/M4/M5 tripwires are logged in RISKS #10–12.

@@ -3,6 +3,46 @@
 > Why things are the way they are. Add a dated entry whenever a task finishes or a plan is
 > executed (newest first). Keep each entry short: what changed and why.
 
+### 2026-07-14 — Workflow machinery M3 (walking skeleton): Step 4 (Implementation) built + proven
+Step 4 of the M3 dogfood — the first step that builds and runs real code — is done: the **production
+Need-slice machinery**, built in small blocks (each red-teamed before the next), then proven end-to-end on
+a toy Need task. All in the **isolated test project**; live `~/.claude` untouched; **not committed** (owner
+approval pending).
+
+**What was built (bundle-destined):** `claude/workflow/workflow.py` — the M2 spine hardened, plus the
+two-halved `RECIPE` (only the `need` row filled), α-1 `prepare` (bundles the rulebook as a framing header;
+ordered COLD→WARM; canary at the end of COLD), the new `publish` verb (D-1, fail-closed, β-2 sentinels),
+and a TOCTOU guard on `record`. Plus `claude/workflow/rulebook.md` (nine rules extracted),
+`claude/agents/challenger.md`, `claude/workflow/conductor.md`. **Harness-only** (not shipped):
+`tools/wf_drift_guard.py` (report-only byte-compare) and three test suites (`tests/workflow/`, **44 checks**).
+
+**Method — the Step-4 team of attackers.** Each block was attacked by four context-free lenses (bugs /
+does-it-run / readability / safety) **plus** a custom **fidelity** attacker (does the code match the settled
+Need/Design/Architecture?), then — because the fixes touched load-bearing code — a **second adversarial
+round** verified each fix closed and hunted regressions. Round 1 caught real defects, all folded: a
+whole-file **LF→CRLF flip** on every Windows `publish`; **sentinel-substring corruption** (a doc merely
+*mentioning* the marker syntax could be miscounted then overwritten → now line-anchored, column-0); a
+**non-ASCII title** crashing `start`/`status` *after* the state write; a **`record` TOCTOU** (a draft edited
+between `prepare` and `record` could mint a fresh receipt for unchallenged bytes); an `artifact_path`
+**case-collision** (`docs/architecture.md` == `ARCHITECTURE.md` on Windows → renamed `docs/draft-<step>.md`).
+The tests then caught a **second** bug the first fix introduced — `read_text(newline=)` is Python 3.13+ and
+the developer runs 3.12 — fixed with raw-bytes I/O. Round 2 came back **clean on all four lenses** (no
+blocking/material); residual minors are real-system/M4/M5 tripwires, now RISKS #10–#12.
+
+**Proven (T2 — all four proof items met).** On a toy Need ("add a search command"), a **real challenger**
+(Sonnet) attacked cold-then-warm over **three rounds** and genuinely converged (blockers → resolved → two
+new materials surfaced *by the revision* → resolved → clean round — the adversarial loop working, not a
+rubber stamp). Live: each revision **staled the receipt and blocked `advance`** until re-challenged
+(proof #1); the canary was verified each round; `publish` did a first-write then an idempotent **re-settle to
+one sentinel pair** (proof #2); `advance` opened only on a fresh receipt. The three `record` failure modes
+(proof #3) are the automated forced-failure suite; replication-readiness (proof #4) was empirically confirmed
+by the fidelity attacker across all five review-style steps. The honest split held: deterministic parts every
+time; model-mediated parts (challenger spawn, warm pass) worked and are visible-on-miss.
+
+**Next: M4** (the other four review-style steps, Step 4's built-in-tool team, region-anchoring, forcing).
+Shipping the new bundle files (sync.py `MANIFEST` / directory-copy) stays **M6** — deliberately not done now,
+since M3 must not touch live `~/.claude`.
+
 ### 2026-07-14 — Workflow machinery M3 (walking skeleton): Step 3 (Architecture) settled
 Step 3 (Architecture) of the M3 dogfood is settled after a **three-round challenger cycle** (resumed on
 Sonnet, converged clean at Round 3). Architecture decides the *internal structure*; M2 already fixed most

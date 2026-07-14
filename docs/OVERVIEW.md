@@ -31,9 +31,23 @@ every machine in sync through git.
 | 2 | Git-based sync as the primary multi-machine flow (clone → pull → install; capture → commit → push) | In use; may automate |
 | 3 | Cross-platform support — one `sync.py` runs install & capture on Windows/macOS/Linux | Done |
 | 4 | Grow the bundle (more skills/agents) as the methodology matures | In progress (v0.3.3: status line) |
-| 5 | Active adversarial workflow (six steps + a challenger) that makes the rules *run* | Building — M1 passed; **M2 passed**; **M3 (walking skeleton) in progress** — Steps 1-3 (Need, Design, Architecture) settled; Step 4 (Implementation) next (`docs/WORKFLOW.md`) |
+| 5 | Active adversarial workflow (six steps + a challenger) that makes the rules *run* | Building — M1 passed; **M2 passed**; **M3 (walking skeleton): Need-slice machinery built + proven end to end** (3-round toy-Need dogfood; all proof items met); M4 (complete the step set) next (`docs/WORKFLOW.md`) |
 
 ## Current status
+**2026-07-14** — **M3 (walking skeleton) — Step 4 (Implementation) built + proven.** The production
+Need-slice machinery is built and passed its bar end to end. `workflow.py` (the M2 spine hardened + the
+two-halved `RECIPE`, the α-1 `prepare`, the fail-closed `publish` verb, a `record` TOCTOU guard), plus the
+extracted `rulebook.md`, `challenger.md`, `conductor.md`; a harness drift-guard and three test suites
+(**44 checks**) round it out. Built in small blocks, each red-teamed by the Step-4 **team of attackers**
+(four context-free lenses + a fidelity attacker), with a **second adversarial round** verifying the fixes —
+which caught real defects (a Windows CRLF flip, sentinel corruption, a non-ASCII crash, a `record` TOCTOU, a
+case-collision) and even a Python-3.12-vs-3.13 API trap the tests exposed. Proven on a toy Need over **three
+real challenger rounds** that genuinely converged: each revision staled the receipt and blocked `advance`
+until re-challenged (proof #1), `publish` re-settled idempotently to one block (proof #2), the forced-failure
+suite covers the three `record` modes (proof #3), and replication-readiness holds for all five review-style
+steps (proof #4). Residual minors → RISKS #10–12. **All in the isolated test project; live `~/.claude`
+untouched; not committed. Next: M4.** Detail in DECISIONS (2026-07-14).
+
 **2026-07-14** — **M3 (walking skeleton) — Step 3 (Architecture) settled.** The thin Need-slice structure,
 settled over **three challenger rounds** (Sonnet, resumed; converged clean). Two human decisions: **A-1** —
 the script bundles the extracted nine-rule rulebook into the challenge package, so the rules are guaranteed
