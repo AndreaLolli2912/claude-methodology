@@ -3,6 +3,59 @@
 > Why things are the way they are. Add a dated entry whenever a task finishes or a plan is
 > executed (newest first). Keep each entry short: what changed and why.
 
+### 2026-07-14 — Workflow machinery M3 (walking skeleton): Step 3 (Architecture) settled
+Step 3 (Architecture) of the M3 dogfood is settled after a **three-round challenger cycle** (resumed on
+Sonnet, converged clean at Round 3). Architecture decides the *internal structure*; M2 already fixed most
+of it (marker, six verbs, honest-floor + canary, advance-gate), so this was the **thin Need-slice map**.
+Two decisions were the human's to make.
+
+**A — how the challenger gets its shared rulebook: chose A-1 (script bundles it into `context.md`), NOT
+A-2 (challenger reads it by path).** A-1 concatenates the extracted nine-rule rulebook into the challenge
+bundle, so the rules sit in the one file the challenger provably reads (canary-adjacent). Traceable to the
+settled M2 spine — *the script assembles verified-correct context*, and the rules are part of correct
+context — and to M3's make-failure-visible philosophy: under A-1 a rules-missing attack can't happen
+silently. **Why A-2 lost:** cleaner P4 separation, but presence becomes model-mediated — "ran without its
+rules" is a silent, unsignalled miss. **A-3 rejected** (rules inlined in the agent) — fails MUST DO 2's
+"extract into one shared file."
+
+**D — does the auto-docs write get its own verb: chose D-1 (new `publish <step>` verb), NOT folding into a
+settled verb.** `publish` reads a model-drafted `overview-entry.md` and places it between β-2 sentinels,
+with a fail-closed contract (missing/empty entry → no write; malformed/duplicate sentinel pair → refuse
+rather than corrupt a real doc; atomic write). Chosen because it leaves the M2-settled verbs (`advance`,
+`record`) **exactly intact** — directly consistent with the α-1 ruling last step (don't churn settled
+contracts) — and a single-responsibility verb is what proof #2 (idempotent re-run) needs. **Why D-2/D-3
+lost:** folding into `advance` (gate) or `record` (runs every round) modifies a settled verb and muddies
+re-settle semantics. *Elevated to a human fork mid-cycle:* the challenger flagged that adding a **seventh**
+verb to the spine Need MUST DO 1 enumerates is a real interface change R2 forbids picking silently — so it
+went to the judge alongside A rather than being pre-filed as builder-tightening.
+
+**The honestly-bounded replication story (the challenger's central catch, twice).** The skeleton's
+per-step `RECIPE` has two halves. The **challenge-context half** (context sources + attack angles) is a
+frozen contract the **five review-style steps** (Need/Design/Architecture/Judgment/Shipping) reuse by
+adding a row. The **publish half** is a v0 seeded on one single-writer-prose slice. **Both halves name
+Step 4 (Implementation) as their exception → M4:** its *team of attackers* (four context-free built-in
+tools + one custom fidelity subagent) doesn't use the cold/warm/canary/receipt machinery on the challenge
+side, and it writes code, not sentinel-prose, on the publish side. The challenger caught this same
+over-generalization first on the publish half, then — after the fold — on the challenge half I'd declared
+clean; both are now bounded, and M3 claims only what it proves (the Need slice of each), with M4
+validating per-step fit as it builds, not pre-certifying it.
+
+**Operator-habit fit (warm pass).** The Need-slice code reaches the isolated test project by a
+**per-iteration** repo→test-project copy — a *third* sync direction `sync.py` doesn't cover. Because the
+operator's documented habit is tool-mediated propagation / never manual-diff, that copy gets a cheap
+**report-only byte-compare drift guard** modeled on `sync.py status` — harness tooling, not shipped
+machinery — so a forgotten re-copy that runs stale code is made visible, not eyeballed.
+
+**Dogfood method note (reusable):** the challenger ran on **Sonnet, resumed across three rounds**, ruling
+each of its own prior findings resolved-or-not by cite-the-line. It caught six real fit findings (five
+material Round 1, one residual Round 2), all folded; the cargo-cult check (Step 3's job) did exactly its
+job — the recommendation didn't flip this time, but the *architecture's honesty* changed materially. M3's
+own dogfood record stays **manual** (this entry, by hand).
+
+**Next: Step 4 (Implementation)** — build the Need-slice code in small tested blocks and run it end-to-end
+on a toy task. Architecture artifact preserved in the session scratchpad (`m3-architecture-draft.md`,
+settled). **No commit yet** (owner approval pending).
+
 ### 2026-07-14 — Workflow machinery M3 (walking skeleton): Step 2 (Design) settled
 Step 2 (Design) of the M3 dogfood is settled after a **three-round challenger cycle** (resumed on
 Sonnet, converged clean at Round 3). Design decides the *approach*; two decisions were in scope.

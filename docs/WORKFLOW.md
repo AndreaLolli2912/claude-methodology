@@ -10,7 +10,7 @@
 > (technical design + de-risk) passed** — the machinery is designed (see `ARCHITECTURE` "Workflow
 > machinery"), de-risked by a throwaway spike, and **live-smoke-tested** (all three hooks/status-line
 > fire in a real session; the test caught and fixed a nudge that was silently inert). **M3 (walking
-> skeleton) is underway — Steps 1-2 (Need, Design) settled** (2026-07-14; see OVERVIEW +
+> skeleton) is underway — Steps 1-3 (Need, Design, Architecture) settled** (2026-07-14; see OVERVIEW +
 > DECISIONS, and the **Build plan** M3 line). Lessons folded into the challenger rules below:
 > operator context (rule 6) and effort triage (rule 7) from M1; and from **dogfooding M2** —
 > attack-anything / defend-from-the-record plus the reopening cap (rule 3), full ranked findings with
@@ -293,10 +293,16 @@ system is built by its own rules. **Each item is a fresh conversation that reads
   refinement).
 - **M3 — Walking skeleton (one step, end to end).** The shared rulebook + one attacker subagent
   (start with Need) + the core conductor for that step + auto-docs for that step. Prove the pattern
-  on one step before replicating. **Steps 1-2 settled 2026-07-14.** Step 1 (Need): Need chosen first;
+  on one step before replicating. **Steps 1-3 settled 2026-07-14.** Step 1 (Need): Need chosen first;
   auto-docs writes OVERVIEW only; nudge -> M5; region-anchoring -> M4. Step 2 (Design): **α-1**
   ordered-visible cold/warm delivery (honest *surfaces*, not *forces*; forcing deferred — see M4) +
-  **β-2** auto-docs (model drafts, script places between sentinels). Next: Step 3 (Architecture).
+  **β-2** auto-docs (model drafts, script places between sentinels). Step 3 (Architecture): **A-1** the
+  script bundles the extracted rulebook into the challenge context (over a model-mediated path-read) +
+  **D-1** a new `publish` verb owns the doc-write, leaving the M2 verbs intact; the "add one row per step"
+  replication promise is honestly **bounded** — the challenge spine is frozen for the **five review-style
+  steps**, and both recipe halves name **Step 4 (Implementation)** as their exception (its team-of-attackers
+  + code-output) -> M4. Written into ARCHITECTURE ("M3 walking skeleton — the Need slice"). Next: Step 4
+  (Implementation).
 - **M4 — Complete the step set.** The other five attacker subagents sharing the rulebook; wire the
   built-in tools into Step 4; add the research-helper; **design region-anchoring** for shared docs (the first shared-writer step
   needs it — moved here from M3, see DECISIONS 2026-07-14); auto-docs for every step;

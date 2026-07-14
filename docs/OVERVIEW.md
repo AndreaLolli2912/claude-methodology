@@ -31,9 +31,22 @@ every machine in sync through git.
 | 2 | Git-based sync as the primary multi-machine flow (clone → pull → install; capture → commit → push) | In use; may automate |
 | 3 | Cross-platform support — one `sync.py` runs install & capture on Windows/macOS/Linux | Done |
 | 4 | Grow the bundle (more skills/agents) as the methodology matures | In progress (v0.3.3: status line) |
-| 5 | Active adversarial workflow (six steps + a challenger) that makes the rules *run* | Building — M1 passed; **M2 passed**; **M3 (walking skeleton) in progress** — Steps 1-2 (Need, Design) settled; Step 3 (Architecture) next (`docs/WORKFLOW.md`) |
+| 5 | Active adversarial workflow (six steps + a challenger) that makes the rules *run* | Building — M1 passed; **M2 passed**; **M3 (walking skeleton) in progress** — Steps 1-3 (Need, Design, Architecture) settled; Step 4 (Implementation) next (`docs/WORKFLOW.md`) |
 
 ## Current status
+**2026-07-14** — **M3 (walking skeleton) — Step 3 (Architecture) settled.** The thin Need-slice structure,
+settled over **three challenger rounds** (Sonnet, resumed; converged clean). Two human decisions: **A-1** —
+the script bundles the extracted nine-rule rulebook into the challenge package, so the rules are guaranteed
+present in the one file the challenger provably reads (over A-2's model-mediated path-read, a silent miss);
+**D-1** — a new `publish` verb owns the settled-doc write (model drafts prose, verb places it between
+markers and refuses rather than corrupt a malformed doc), leaving the M2-settled verbs untouched — the same
+"don't churn settled contracts" principle as last step's α-1 (over folding it into `advance`/`record`). The
+challenger's central catch, landed **twice**: the "add one row per step" replication promise over-generalized
+— now honestly bounded, with the challenge spine frozen for the **five review-style steps** and both recipe
+halves naming **Step 4 (Implementation)** as their exception → M4. Full rationale in DECISIONS (2026-07-14).
+Architecture is written into `ARCHITECTURE` ("M3 walking skeleton — the Need slice"). **Step 4
+(Implementation) next.** Not committed yet.
+
 **2026-07-14** — **M3 (walking skeleton) — Step 2 (Design) settled.** Chose **α-1** (ordered-visible
 cold/warm delivery — the challenger reads one bundle and returns cold-then-warm verdicts; honestly
 *surfaces* whether a cold read happened, does **not** force it; forcing deferred to an observable

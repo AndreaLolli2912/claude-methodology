@@ -175,3 +175,64 @@ real cost. Accept-and-document stays sound precisely because the light never ove
 - **Deploying whole `agents/`/`hooks/` directories.** `sync.py` copies file-by-file; shipping the
   machinery (M6) needs a directory-copy change. To be logged in `RISKS` at Shipping (M6); not
   an M2 problem.
+
+### M3 walking skeleton — the Need slice (settled 2026-07-14)
+
+> The **thin** Need-slice structure that hardens the M2 spike into production code for ONE step (Need),
+> under the settled Design (α-1 ordered-visible cold/warm delivery + β-2 sentinel auto-docs). M2 fixed the
+> marker/verbs/honest-floor/gate; this section adds only what the Need slice needs. Full rationale +
+> the two human decisions are in `DECISIONS` (2026-07-14).
+
+**The per-step recipe — one structure, two halves of very different reach.** A `RECIPE` dict in
+`workflow.py`, keyed by step name, holds each step's specifics so nothing else is step-aware:
+- **Challenge-context half** (`cold_sources`, `warm_sources`, `attack_angles`) — a **frozen contract the
+  five review-style steps** (Need/Design/Architecture/Judgment/Shipping) reuse by adding a row; `prepare`
+  consumes it. The rulebook/canary/receipt/gate are step-agnostic (M2). M3 proves it on Need; M4 adds the
+  other four review-style rows, validating each fit as it builds.
+- **Publish half** (`publish: {mode, doc_target, sentinel_key, anchor}`) — a **v0 seeded on one
+  single-writer-prose slice** (Need→`OVERVIEW`); `publish` consumes it. It does **not** generalize as-is:
+  M4 must enrich it (region-anchoring for shared docs, list-valued targets for Shipping, a code-output
+  mode for Implementation, per-target anchor strategy).
+- **Both halves name Step 4 (Implementation) as their exception → M4:** its *team of attackers* (four
+  context-free built-in tools + one custom fidelity subagent) doesn't use the cold/warm/canary/receipt
+  machinery on the challenge side, and writes code (not sentinel-prose) on the publish side. (The custom
+  fidelity subagent *is* spine-compatible; the context-free built-ins + the fan-out/aggregate shape are
+  what need new M4 wiring.)
+
+**Rulebook delivery (Decision A → A-1).** The nine challenger rules are **extracted into one shared file**
+(`claude/workflow/rulebook.md`, MUST DO 2). `prepare` **bundles the rulebook into `.workflow/context.md`**
+as a framing header — so the rules sit in the one file the challenger provably reads (canary-adjacent
+presence), rather than being pulled by a model-mediated path read that could silently miss.
+
+**The auto-docs verb (Decision D → D-1) — a new `publish <step>`.** Added to the interface **without
+altering any settled M2 verb**. The model drafts the settled-step prose into `.workflow/overview-entry.md`;
+`publish` places it between β-2 sentinels. **Fail-closed contract** (it is the only verb writing a real,
+committed doc): missing/empty entry → no write, non-zero; a `WF:<step>:start` with no matching `:end`, or
+more than one pair for the key → **refuse** (never guess into a malformed doc); zero pairs → first-write
+(prepend under `anchor`), one pair → replace-in-place; write is atomic (temp-then-replace).
+
+**The contracts (P5) the Need slice adds:**
+- `.workflow/context.md` (written by `prepare`, implements α-1): `[rulebook header] [two-pass instruction:
+  cold verdict first] [attack angles]` then a delimited **COLD** section (canary token + the artifact +
+  the settled docs) and a **WARM** section (`OPERATOR.md` + the usually-empty global-habits slot). One
+  bundle, cold+warm visible and ordered — honest *surfacing*, not *forcing*. `context_hash` is over the
+  file's raw bytes (M2).
+- `.workflow/challenge.md` (written by the challenger, read by `record`): `## COLD verdict` (echoes the
+  canary + ranked findings) then `## WARM verdict`. `record` needs only "a result exists + canary echoed";
+  the ranked findings are human-facing. The canary proves the context was **read**, not that both passes
+  ran (the honest self-reported ceiling stands).
+- Sentinels (β-2): `<!-- WF:need:start task="<id>" -->` … `<!-- WF:need:end -->`; `anchor` for OVERVIEW is
+  `## Current status` (an OVERVIEW-specific value — part of the non-generalizing publish half).
+
+**Files + how they reach the test project (MUST DO 8).** Bundle-destined, production-quality:
+`claude/workflow/workflow.py` (the Need-slice verbs + `publish` + `RECIPE` + shared `receipt_state()`),
+`claude/agents/challenger.md` (the one adaptable attacker), `claude/workflow/rulebook.md`,
+`claude/workflow/conductor.md`. They reach the **isolated test project** by a **per-iteration** repo→
+test-project copy — a *third* propagation direction `sync.py` doesn't cover (extending it is M6). Because
+the operator propagates by tool and never manual-diffs, a **report-only byte-compare drift guard** (modeled
+on `sync.py status`, harness tooling only) flags a stale copy before each test run. Live `~/.claude` is
+never touched; **no workflow hooks** in M3 (nudge/skip-warner are M5).
+
+**Deferred from the Need slice:** publish-half enrichment, the four remaining review-style rows, Step 4's
+built-in-tool team, the research helper, forcing the cold read (α-2) → **M4**; the ambient surface (status
+line, nudge, skip-warner) → **M5**.
