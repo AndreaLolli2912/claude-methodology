@@ -10,7 +10,8 @@
 > (technical design + de-risk) passed** — the machinery is designed (see `ARCHITECTURE` "Workflow
 > machinery"), de-risked by a throwaway spike, and **live-smoke-tested** (all three hooks/status-line
 > fire in a real session; the test caught and fixed a nudge that was silently inert). **M3 (walking
-> skeleton) is next** (see the M2 line in **Build plan**). Lessons folded into the challenger rules below:
+> skeleton) is underway — Steps 1-2 (Need, Design) settled** (2026-07-14; see OVERVIEW +
+> DECISIONS, and the **Build plan** M3 line). Lessons folded into the challenger rules below:
 > operator context (rule 6) and effort triage (rule 7) from M1; and from **dogfooding M2** —
 > attack-anything / defend-from-the-record plus the reopening cap (rule 3), full ranked findings with
 > severity tags (rule 5), and the cold-then-warm two-pass read (rule 6).
@@ -292,15 +293,21 @@ system is built by its own rules. **Each item is a fresh conversation that reads
   refinement).
 - **M3 — Walking skeleton (one step, end to end).** The shared rulebook + one attacker subagent
   (start with Need) + the core conductor for that step + auto-docs for that step. Prove the pattern
-  on one step before replicating.
+  on one step before replicating. **Steps 1-2 settled 2026-07-14.** Step 1 (Need): Need chosen first;
+  auto-docs writes OVERVIEW only; nudge -> M5; region-anchoring -> M4. Step 2 (Design): **α-1**
+  ordered-visible cold/warm delivery (honest *surfaces*, not *forces*; forcing deferred — see M4) +
+  **β-2** auto-docs (model drafts, script places between sentinels). Next: Step 3 (Architecture).
 - **M4 — Complete the step set.** The other five attacker subagents sharing the rulebook; wire the
-  built-in tools into Step 4; add the research-helper; auto-docs for every step.
+  built-in tools into Step 4; add the research-helper; **design region-anchoring** for shared docs (the first shared-writer step
+  needs it — moved here from M3, see DECISIONS 2026-07-14); auto-docs for every step;
+  **revisit forcing the cold read** (deferred α-2 from M3 Step 2) as the warm set grows across the
+  added steps — see DECISIONS 2026-07-14.
 - **M5 — Control layer.** Status line shows the current step; one soft-flag hook for step-skips.
 - **M6 — Transport & packaging.** Grow `sync.py` to deploy whole `skills/ agents/ hooks/` directories
   (retiring the per-file manifest); update the `CLAUDE.md` core and `METHODOLOGY.md`; bump the
   version + `CHANGELOG`. Plain `~/.claude` bundle by default (personal use), not a plugin, unless we
   later choose to share it.
 
-**Still open, to decide when we reach them:** whether each attacker is a separate file or one
-adaptable agent; which step to skeleton first (Need, or the Step-4 fidelity attacker); plain bundle
-vs. plugin.
+**Still open, to decide when we reach them:** plain `~/.claude` bundle vs. plugin (M6). *(Resolved
+since: one **adaptable** challenger file, not one per step — ARCHITECTURE; and skeleton the **Need**
+step first — M3, 2026-07-14.)*

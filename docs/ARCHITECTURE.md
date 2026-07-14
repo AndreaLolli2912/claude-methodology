@@ -161,11 +161,14 @@ against your own tool faking a receipt (a threat that does not exist on a single
 real cost. Accept-and-document stays sound precisely because the light never over-claims.
 
 ### Deliberately deferred (recorded here, not solved in M2)
-- **Region-hashing inside shared logs.** The spike gives each step its *own* file, so "the
+- **Region-hashing for shared docs (moved to M4 — see DECISIONS 2026-07-14).** The spike gives each step its *own* file, so "the
   artifact" is one cleanly-hashable thing. The real docs are in-place living files
-  (OVERVIEW/ARCHITECTURE) and prepend/append logs (DECISIONS/RISKS); whole-file hashing is fine
-  for an in-place doc but breaks on a *shared* log written by several steps. So the spike's
-  hash-gate result is valid only for **single-file** artifacts, and M3 must design region-anchoring.
+  (OVERVIEW/ARCHITECTURE) and prepend/append logs (DECISIONS/RISKS); whole-file hashing is correct only for a **single-writer** doc; it breaks on a **shared** doc
+  written by several steps — and the trigger is *sharing*, **not** log-vs-in-place (`OVERVIEW` is
+  in-place yet becomes shared once both Need and Judgment write it). **In M3 the Need step is the
+  single writer of `OVERVIEW`, so whole-file hashing is valid here;** region-anchoring is therefore
+  **M4** work, first needed at the first shared-writer target (a log like Design->DECISIONS, or a
+  shared in-place doc like Judgment->OVERVIEW).
 - **Backward movement / regression.** `current_step` only advances, but the workflow's own rules
   (reopen on contradiction; a no-go at Judgment sends work back) need a way to step back. The spike
   will not exercise it — flagged as not-yet-covered, not pretended-handled.

@@ -31,9 +31,43 @@ every machine in sync through git.
 | 2 | Git-based sync as the primary multi-machine flow (clone → pull → install; capture → commit → push) | In use; may automate |
 | 3 | Cross-platform support — one `sync.py` runs install & capture on Windows/macOS/Linux | Done |
 | 4 | Grow the bundle (more skills/agents) as the methodology matures | In progress (v0.3.3: status line) |
-| 5 | Active adversarial workflow (six steps + a challenger) that makes the rules *run* | Building — M1 (by-hand) passed; **M2 (design + de-risk) passed** — machinery designed, de-risked, and live-smoke-tested; **M3 (walking skeleton) next** (`docs/WORKFLOW.md`) |
+| 5 | Active adversarial workflow (six steps + a challenger) that makes the rules *run* | Building — M1 passed; **M2 passed**; **M3 (walking skeleton) in progress** — Steps 1-2 (Need, Design) settled; Step 3 (Architecture) next (`docs/WORKFLOW.md`) |
 
 ## Current status
+**2026-07-14** — **M3 (walking skeleton) — Step 2 (Design) settled.** Chose **α-1** (ordered-visible
+cold/warm delivery — the challenger reads one bundle and returns cold-then-warm verdicts; honestly
+*surfaces* whether a cold read happened, does **not** force it; forcing deferred to an observable
+trigger — warm-set growth or the M4/M5 control layer — anchored on the WORKFLOW M4 build-plan line)
+over α-2 (presence-sequenced *forcing*, which would extend the M2-settled `prepare`/`record`/gate
+contracts). Chose **β-2** for auto-docs (the model drafts the settled-Need prose; the script places it
+between sentinel markers — prepend-newest-first on first write, replace-in-place on re-settle;
+structural idempotence meets proof #2). Converged over **three challenger rounds**; the recommendation
+**flipped α-2 → α-1 mid-cycle** when the challenger disclosed α-2's settled-verb cost — the adversarial
+process working as designed. Full rationale + the conscious *no-clean-trace* acceptance in DECISIONS
+(2026-07-14). **Step 3 (Architecture) next.** Not committed yet.
+
+**2026-07-14** — **M3 (walking skeleton) — Step 1 (Need) settled.** Opened M3: build the *real*
+machinery for ONE step (Need), thin but complete, to prove the builder -> challenger -> judge ->
+auto-docs pattern before replicating it for the other five steps (M4). Run as the six-step dogfood;
+**the Need settled after five challenger rounds** (findings converged 11 -> 4 -> 1 -> 0-clean).
+- **What the Need-step skeleton must do:** conduct the Need loop from the marker + conductor
+  (survey -> draft -> `prepare` context -> spawn challenger -> `record` -> human settles ->
+  `advance`); extract the nine challenger rules into **one shared rulebook**; assemble
+  **verified-correct challenger context** with an *honest* cold/warm split (the canary proves the
+  context was *read*, not that both passes ran); spawn **one adaptable attacker**; write an **honest
+  receipt** with a load-bearing failure path (no false green); **auto-write the settled Need into
+  `OVERVIEW`**; **gate advancement** on a fresh receipt; ship **production-quality, bundle-destined
+  code** proven in an **isolated test project** first.
+- **Not in M3** (scoped out): the other five steps and region-anchoring (M4); the ambient surface —
+  status line, both hooks including the nudge, and the skip-warner (M5).
+- **Proof-of-success:** end-to-end on a toy Need task over >=2 rounds (a revised draft stales the
+  prior receipt and *blocks* advance until re-challenged); auto-docs idempotent; all three `record`
+  failure modes read honestly missing/stale; replication-ready (a single-writer step needs no
+  hash-gate edit; a shared-doc step needs region-anchoring — M4).
+- **Key judge calls:** nudge -> M5; auto-docs `OVERVIEW`-only; region-anchoring reopened M3 -> M4
+  (trigger is *single-writer vs. shared*, not in-place-vs-log). Full detail + the reopen in DECISIONS
+  (2026-07-14). **Paused before Step 2 (Design)** at a clean checkpoint; not committed yet.
+
 **2026-07-14** — **M2 complete: the live smoke-test passed, M3 unblocked.** The condition on M2's "go"
 verdict — hooks and status line actually firing in a real session — is now met. Launched Claude Code in
 the isolated spike and confirmed all three live: the status line (`wf: [need!]`), the nudge (injects the

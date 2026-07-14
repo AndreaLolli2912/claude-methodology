@@ -3,6 +3,85 @@
 > Why things are the way they are. Add a dated entry whenever a task finishes or a plan is
 > executed (newest first). Keep each entry short: what changed and why.
 
+### 2026-07-14 — Workflow machinery M3 (walking skeleton): Step 2 (Design) settled
+Step 2 (Design) of the M3 dogfood is settled after a **three-round challenger cycle** (resumed on
+Sonnet, converged clean at Round 3). Design decides the *approach*; two decisions were in scope.
+
+**α — cold/warm challenge delivery: chose α-1 (ordered-visible, honest), NOT α-2 (presence-
+sequenced / forcing).** α-1 hands the challenger one bundle (cold + warm, delimited), instructs
+"cold verdict first," and returns verdicts in order — honestly labelled as *surfacing* whether a
+cold read happened, **not forcing** one. Traceable to the Need: MUST DO 3 sanctions ordered-visible
+and requires honest *separation*, **not** forcing. Chosen because a walking skeleton should stay
+thin and **leave the M2-settled verbs intact**, and because forcing lives in the *shared* machinery
+(one `workflow.py`, one adaptable challenger), so adding it later is a single-site change.
+**Why α-2 lost:** it makes cold-read contamination impossible (under our threat model) but only by
+**extending the M2-settled contracts** — `prepare`→two-phase, `record`→per-phase, +a warm-release
+gate — too much settled-architecture churn for a thin skeleton now, and cheaply reversible later.
+
+**The conscious call being ratified (challenger's observation):** for *this one decision* we accept
+a failure mode with **no clean trace** — a warm-contaminated "cold" verdict is *suspectable, not
+detectable* — which the firing machinery elsewhere refuses (the M2 precedent against self-authored
+"confident mistakes"). Defensible from the record: the Need author put ordered-visible on the table
+knowing its failure isn't cleanly visible.
+
+**Forcing deferred to an *observable* trigger** (not the killed "detect contamination" trigger):
+when the warm set grows materially beyond `OPERATOR.md`, or when the M4/M5 control layer is built.
+**Owner-anchored** on the `WORKFLOW` M4 build-plan line so the deferral isn't forgotten (P2).
+
+**β — auto-docs authorship: chose β-2 (model drafts prose, script places between sentinels).** The
+model writes the settled-Need prose; the script places it between stable sentinels — **prepend
+newest-first** on first write (matching `OVERVIEW`'s real prepend-log convention), **replace in
+place** on re-settle. Structural idempotence (no duplicate block) satisfies proof #2; semantic drift
+between redraws is accepted (proof #2 forbids duplicates, not drift). Keeps the honest split
+**model owns wording, script owns placement**. **Why β-1 lost:** a deterministic template is rigid
+— real `OVERVIEW` entries are prose, not fielded — and adds a fiddly structured-field contract.
+Confirmed **no M4 scope leak**: sentinels do single-writer write-placement, not shared-doc hashing
+(region-anchoring stays M4).
+
+**Dogfood method note (reusable):** the recommendation **flipped α-2 → α-1 mid-cycle** because the
+challenger disclosed a cost the builder had missed (α-2 extends settled M2 verbs) — the adversarial
+process working as designed, not a builder whim. β-2's two write-mechanism gaps (insertion position;
+an over-broad "idempotent" claim) were both closed under challenge. Deferred refinements logged: β
+diff-on-re-settle and multi-task position-drift → real system.
+
+**Next: Step 3 (Architecture).** Settled at the human's call; Design artifact preserved in the
+session scratchpad (`m3-design-draft.md`, v3). **No commit yet** (owner approval pending).
+
+### 2026-07-14 — Workflow machinery M3 (walking skeleton): Step 1 (Need) settled
+Opened **M3 — the walking skeleton**: build the *real* machinery for ONE workflow step (Need), thin
+but complete, to prove the builder -> challenger -> judge -> auto-docs pattern before replicating it
+for the other five steps (M4). Run as the six-step dogfood (builder + a fresh challenger subagent per
+round + human judge), same as M1/M2. **Step 1 (Need) is settled** after a **five-round challenger
+cycle** (findings converged 11 -> 4 -> 1 -> 0-clean). The settled Need lives in `OVERVIEW` (top status
+entry).
+
+**Scope decided (human judge):**
+- **Skeleton the Need step first**, proven in an **isolated test project** (`init-project-docs`-
+  scaffolded docs; its own project settings; live `~/.claude` never touched).
+- **Nudge hook -> M5** (not M3): M3 is the model-driven core + auto-docs; the nudge — already proven
+  live in the M2 spike — joins the ambient control layer later. The `PreToolUse` skip-warner is
+  Implementation-specific, also out.
+- **Auto-docs writes `OVERVIEW` only**; seeding `ARCHITECTURE` (the Step-1 spec's second write) is a
+  conscious deferral to M4.
+
+**A settled decision reopened (challenger round 3; human ruled):** `ARCHITECTURE`'s "M3 must design
+region-anchoring" is **moved to M4**. In M3 the Need step is the **single writer** of `OVERVIEW`, so
+whole-file hashing is correct here. The real trigger for region-anchoring is a doc being **shared
+(multiple writers)** — **not** in-place-vs-log, a mischaracterization the challenger caught and killed
+twice (`OVERVIEW` is in-place yet becomes shared once Judgment also writes it). Region-anchoring first
+bites in M4 at the first shared-writer target — a log (Design->`DECISIONS`) **or** a shared in-place
+doc (Judgment->`OVERVIEW`). `ARCHITECTURE` synced this turn (P2).
+
+**Dogfood method note (reusable):** the challenger ran on **Sonnet, resumed across rounds** so each
+round drills into the last — judging whether its *own* prior findings were actually resolved
+(cite-the-line), not a rubber stamp. It caught a **regression the builder introduced in v3** (the
+in-place-vs-log dichotomy) — which is why the *single-writer/shared* and *cold/warm* distinctions are
+load-bearing. M3's own dogfood record stays **manual** (this entry, by hand): auto-docs is proven only
+inside the throwaway harness, never against the real repo docs.
+
+**Next: Step 2 (Design)** — paused here at the human's call (a clean checkpoint). Need artifact
+preserved in the session scratchpad (`m3-need-draft.md`, v4). **No commit yet** (owner approval pending).
+
 ### 2026-07-14 — Workflow machinery: M2 condition discharged — live smoke-test passed (caught a real bug)
 Ran the live smoke-test that M2's "go, with conditions" verdict was gated on: launched Claude Code
 inside the isolated spike project and drove real prompts. **All three live signals confirmed** — the
