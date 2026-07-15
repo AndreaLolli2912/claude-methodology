@@ -34,6 +34,89 @@ every machine in sync through git.
 | 5 | Active adversarial workflow (six steps + a challenger) that makes the rules *run* | Building — M1 passed; **M2 passed**; **M3 (walking skeleton): Need-slice machinery built + proven end to end** (3-round toy-Need dogfood; all proof items met); M4 (complete the step set) next (`docs/WORKFLOW.md`) |
 
 ## Current status
+
+<!-- WF:anchor:current-status -->
+
+**2026-07-15** — **M4 (complete the step set) — COMPLETE. Step 6 (Shipping) settled; the six-step machinery is
+built.** The Shipping challenger found **no blocking issues** and verified rather than accepted — it re-ran the
+suite itself (124/124), read `sync.py`'s MANIFEST, and checked the diff stats against the claim. Its three
+material findings are closed: the **self-hosting gap** recorded (RISKS #16 — `ROOT` is the script's folder, so
+every live proof ran on byte-identical sandbox *copies*; "proven on the real docs" honestly means "proven on
+their exact bytes"); the **rollback demonstrated** rather than argued (stashing all of M4 leaves a clean tree,
+a parsing pre-M4 script, and 0 anchors in all three docs — so a revert is provably clean); and the **ephemeral
+evidence trail** harvested into a durable PLAYBOOK recipe. Two minors → RISKS #17 (two writes raise a raw
+traceback — accepted: they fail *loud*, never silently green). **The harvested lesson:** the live smoke-test is
+what pays — budget for it every milestone, and verify every fix with a control. **M4 ships the publish engine +
+four rows + 124 checks + the synced record; it is NOT deployed** (`sync.py`'s MANIFEST doesn't ship
+`workflow/*` — RISKS #8, M6), so it has zero live blast radius. **M5 (hooks + status line) next**, inheriting
+RISKS #15 and #17.
+
+**2026-07-15** — **M4 (complete the step set) — Step 5 (Judgment) settled: GO. The live smoke-test passed and
+paid for itself.** Discharged M4's one owed item — the dogfood had proven the chain with a *scripted*
+challenger, so "end-to-end" only covered the deterministic half. Walked all four new rows with **real spawned
+Sonnet challengers** in a sandbox seeded with copies of the real docs. Bar met on all five items: 4/4 challengers
+echoed a fresh canary verbatim; every publish was byte-surgical (stripping the blocks reproduced all three
+originals exactly); **twelve real refusals**; the three publishing rows advanced through the gate without
+`--force`. It found **two things 121 deterministic checks could not** — a scripted challenger does only what it
+is told, a live one reads its whole environment. **Fixed:** `prepare` never cleared the previous round's
+`challenge.md`, so two live challengers read the prior verdict and reported it back as "corroboration" —
+contamination dressed as independent confirmation (the mirror of the entry bug, one file over; proven with a
+control against the pre-M4 script). **Documented (RISKS #15, deferred to M5):** later steps challenge a record
+that lacks every earlier correction, because `prior_settled` feeds the *drafts* while corrections live in the
+*entry* — and folding one back into a draft flips its receipt stale. Not a code bug; its fix reopens a settled
+design decision. **124/124 on 3.12.7.** Sandbox only; not committed. **Step 6 (Shipping) next — the commit.**
+
+**2026-07-15** — **M4 (complete the step set) — Step 4 (Implementation) built + settled.** The publish subsystem
+is built (the data-driven `_place_block` engine + the four review rows + migrated tests + seeded real docs) and
+hardened by a full Step-4 red-team: the team of attackers plus four convergence rounds found and fixed **eleven
+blocking defects** — an ungated publish, a stale/cross-scope entry publish, and the code-fence fail-closed guard
+defeated five ways (cross-validated against the CommonMark reference parser by the round-4 red-team). **121/121
+checks on Python 3.12.7**, including a committed read-only test proving the real docs are valid publish targets
+(unmutated). Caveat: the four new rows' end-to-end tests exercise the *deterministic chain* only — a live
+real-challenger smoke-test against a new row is owed. By hand; sandbox only; not committed. **Step 5 (Judgment) next.**
+
+**2026-07-14** — **M4 (complete the step set) — Step 3 (Architecture) settled.** By hand; a fresh challenger
+attacked the internal structure over **two rounds** (grep-verified against the real code/docs), converging
+clean. Settled: one `_place_block` core (identity-match + fail-closed guard + replace) with a 2-way insert
+(`prepend` for logs; `append_section`, stable order, for reference sections); publish schema `{mode,
+doc_target, block_key, anchor_slug}`; `--new`/`--update` intent for section writes (fail-closed on mismatch;
+the wrong-valid-slug residual accepted as human-diff-gated); **both** halves of RISKS #12 (fence carve-out +
+key-agnostic entry guard); manual one-time anchor seeding with concrete placements; the old publish path
+retired; an honest test migration. **Step 4 (Implementation) next** — the code. Not committed.
+
+**2026-07-14** — **M4 (complete the step set) — Step 2 (Design) settled.** M4's Design step ran **by hand**
+(the `design` row is one of M4's own deliverables; the machinery dogfood resumes per-row at Implementation).
+A fresh challenger attacked over **three rounds** against the real `cmd_publish` and docs — breaking three of
+four first-draft recommendations, then converging clean. Settled: **one sentinel engine** — both-ends-identity
+markers `WF:<key>:<scope>:start/end` parameterized by `(scope: task_id | section-slug) × (placement: prepend |
+replace-or-create)` — covering **log-accumulate** (fixes the cross-task clobber) and **sectioned
+replace-or-create**; **seeded per-location anchors** (`WF:anchor:<slug>`, not fragile headings); **Shipping
+publishes nothing** (a second exception; its docs stay human-curated); the cold bundle unchanged. Proof #4
+amended (Shipping proves through `record` only). **Step 3 (Architecture) next.** Not committed.
+
+**2026-07-14** — **M4 (complete the step set) — Step 1 (Need) settled.** Opened M4 and ran its Need step as a
+dogfood **on the real M3 machinery** — the first non-toy run of `workflow.py` (`start → prepare →` a real
+challenger over **three rounds** `→ record → publish → advance`), the canary/receipt honest floor live throughout.
+- **Scope (human-sliced this session):** build the **four remaining review-style rows**
+  (`design`/`architecture`/`judgment`/`shipping`) as data, and generalize `publish` to the document **shapes**
+  they truly write — **log-accumulate** (a dated-log prepend that accumulates across tasks) and **sectioned
+  replace-or-create** (region-anchoring). **Deferred, recorded:** Step 4's built-in-tool attacker team, the
+  research-helper, and forcing the cold read (α-2); the deferral criterion is *mechanism* (a genuinely different
+  attack mechanism), not effort.
+- **A real bug the challenge surfaced:** M3's `need → OVERVIEW` publish matches its block by sentinel **key
+  alone**, so a *second* task would clobber the first task's entry — `need → OVERVIEW` is itself a log-accumulate
+  target (RISKS #12). M4's log-accumulate mode fixes it while preserving the proven single-task behaviour.
+- **RISKS #12 fence half (human ruling):** the residual "sentinel-shaped line inside a code fence" path is made
+  **fail-closed (refuse), never a silent overwrite**; full fence-aware parsing stays a narrowed, still-open risk.
+- **Proof-of-success:** every new mode proven surgical at the **byte level** on real docs (LF + CRLF, cross-task
+  no-clobber, fail-closed on malformed input); each of the four steps dogfooded end-to-end; the 44 checks stay
+  green + new tests, on Python 3.12.
+- **Open for Design/Architecture:** the log-accumulate mechanism (task-scoped sentinels?), region-anchoring
+  bounds + create-if-absent, Shipping's scope + cross-file partial failure, and whether the growing cold bundle
+  needs a selection policy.
+Converged clean over three challenger rounds (findings 9 → 2 → 0). **Step 2 (Design) next.** Sandbox dogfood;
+live `~/.claude` untouched; not committed.
+
 **2026-07-14** — **M3 (walking skeleton) — Step 4 (Implementation) built + proven.** The production
 Need-slice machinery is built and passed its bar end to end. `workflow.py` (the M2 spine hardened + the
 two-halved `RECIPE`, the α-1 `prepare`, the fail-closed `publish` verb, a `record` TOCTOU guard), plus the

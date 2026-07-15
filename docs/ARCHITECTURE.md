@@ -49,7 +49,11 @@ the script, and vice versa.
 | Git | Version control + multi-machine sync transport | Repo is the source of truth; clone/pull/push is the sync path |
 | Markdown | Format of the methodology + these docs | Claude Code loads `CLAUDE.md`/skills as Markdown; human-readable |
 
-## Workflow machinery (designed 2026-07-14 — M2; not built yet)
+## Workflow machinery (M2 designed → M3 Need slice built → M4 completing the step set; 2026-07-14)
+
+<!-- WF:anchor:architecture-sections -->
+
+<!-- WF:arch:workflow-machinery:start -->
 
 > A second, independent subsystem: the machinery that makes the six-step adversarial workflow
 > (`docs/WORKFLOW.md`) actually *run*. Designed and de-risked in milestone M2; the throwaway
@@ -178,6 +182,13 @@ real cost. Accept-and-document stays sound precisely because the light never ove
 
 ### M3 walking skeleton — the Need slice (settled 2026-07-14)
 
+> **Superseded by "M4 — completing the step set: the publish engine" (below).** Kept as the dated M3
+> milestone record. Mechanisms it describes were replaced in M4: the start-only `WF:need:start task="<id>"`
+> sentinel (now both-ends-identity `WF:<key>:<scope>:start`/`:end`); the `## Current status` *heading* anchor
+> (now a seeded `<!-- WF:anchor:<slug> -->` comment); the `{mode, doc_target, sentinel_key, anchor}` publish
+> schema (now `{mode, doc_target, block_key, anchor_slug}`); and "the publish half does not generalize as-is"
+> (M4 generalized it into `_place_block`). Read the M4 subsection for the current design.
+
 > The **thin** Need-slice structure that hardens the M2 spike into production code for ONE step (Need),
 > under the settled Design (α-1 ordered-visible cold/warm delivery + β-2 sentinel auto-docs). M2 fixed the
 > marker/verbs/honest-floor/gate; this section adds only what the Need slice needs. Full rationale +
@@ -246,3 +257,79 @@ lives at `docs/draft-<step>.md`, not `docs/<step>.md` — a bare `docs/architect
 (and to avoid `read_text(newline=)`, which is Python 3.13+ while the developer runs 3.12). Harness tooling:
 `tools/wf_drift_guard.py` byte-compares the repo→test-project copy before each run. Residual
 real-system/M4/M5 tripwires are logged in RISKS #10–12.
+
+### M4 — completing the step set: the publish engine (Architecture settled 2026-07-14; building at Step 4)
+
+> M4 adds the four remaining review-style rows and generalizes the M3 publish half from "one
+> single-writer-prose slice" into a data-driven engine that writes the real doc **shapes**. Need + Design +
+> Architecture settled **by hand** (dogfooded — the Need step ran on the real machinery). Full rationale + the
+> five Design decisions + six Architecture decisions are in `DECISIONS` (2026-07-14).
+
+**One sentinel engine, parameterized.** The old single-mode `cmd_publish` body is retired in favour of one
+core `_place_block(doc, block_key, scope, anchor_slug, placement, body)`:
+- **Both-ends-identity markers** `<!-- WF:<key>:<scope>:start -->` … `:end` — the identity `(key,scope)` is on
+  **both** ends (the M3 start-only format let a second task clobber the first — RISKS #12 key-half). A publish
+  matches only *its own* `(key,scope)` pair: `0/0` → insert, `1/1` → replace-in-place, else → fail-closed.
+  Other scopes are invisible, so blocks **accumulate**.
+- **Two insert strategies** (the only branch): `prepend` for **log-accumulate** targets (DECISIONS, OVERVIEW
+  status — newest-first; `scope = task_id`) and `append_section` for **sectioned** targets (ARCHITECTURE —
+  after the last managed block under the anchor, **stable order**; `scope = section-slug`).
+- **Seeded per-location anchors** `<!-- WF:anchor:<slug> -->` (not fragile prose headings; DECISIONS has no
+  `##` heading), shared across keys so Need + Judgment interleave under one OVERVIEW anchor; `findall`+count
+  == 1 or fail-closed.
+
+**The RECIPE publish half** grows to `{mode, doc_target, block_key, anchor_slug}` (`mode` ∈ log | section;
+the architecture step's `block_key` is `arch`). Section writes take `--section <slug>` + explicit
+`--new`/`--update` intent (fail-closed on count mismatch; a typo to a *different existing* slug is the one
+accepted, human-diff-gated residual → RISKS). **Both halves of RISKS #12** close here: the fence carve-out
+*and* a **key-agnostic** entry guard (reject any column-0 WF marker line in a drafted entry).
+
+**Shipping is a second publish-exception** (alongside Implementation): it has a challenge row but **no publish
+half** — there is no valid auto-target (`claude/CHANGELOG.md` is hook-parsed semver; RISKS/PLAYBOOK are
+curated). Its docs + the commit stay human. **Proof #4** is amended accordingly: the three publishing steps
+prove through `publish`+`advance`; Shipping proves through `record` only.
+
+**Building at Step 4:** retire the old publish body, add the four rows as data, one-time seed + retrofit the
+real docs (wrap this `## Workflow machinery` body once as the first managed section), and migrate the tests
+(~11 rewritten, #14 retired, mode tests added). Each block is red-teamed by the Step-4 team of attackers; each
+row is dogfooded through the machinery (proof #4).
+
+**Built + hardened at Step 4 (2026-07-15).** Implemented as above, plus three builder refinements the red-team
+forced (all faithful to the settled contracts):
+- **`publish` is gated.** It refuses unless the step is *current* AND holds a *fresh* receipt, so unvouched
+  prose can never reach a committed doc — the honest floor, extended from `advance` to the publish verb.
+- **The entry lifecycle guarantees a freshly-drafted entry per publish.** `record` clears any leftover
+  `.workflow/publish-entry.md` *before* it writes the receipt, and `publish` consumes the entry *before* it
+  writes the doc — both fail-closed. So a stale entry from a prior round, or one section's entry re-used for
+  another, can never publish (RISKS #13 for the inherent residual — a fresh-but-divergent entry).
+- **The challenge lifecycle guarantees a clean bundle per round** (added at Step 5, from the live smoke-test).
+  `prepare` clears the previous round's `.workflow/challenge.md` *before* planting the new bundle, fail-closed,
+  and *after* every validation check (so a refused `prepare` never destroys the prior result). The challenger is
+  told to **write** that path, so whatever sits there is context it reads: leaving it made two live challengers
+  echo the prior round's findings back as "corroboration". A stale result could never earn a receipt (the canary
+  check rejects it), so this protects the challenger's **independence**, not the receipt — the same
+  leftover-file species as the entry clear, one file over.
+- **The fence guard is a CommonMark state machine.** `_wf_marker_in_fence` tracks the opening delimiter's
+  character and length, honours the backtick-info-string rule, and normalizes all line endings (LF/CRLF/bare
+  CR); it refuses any publish with a column-0 `WF:` marker inside a ` ``` `/`~~~`/indented fence. Its fence
+  rules were **cross-validated against the CommonMark reference parser by the Step-4 red-team (round 4)** — the
+  committed tests themselves are stdlib-only, hand-written to the spec's fence rules (no reference-parser
+  dependency ships). This delivers the RISKS #12 "cheap fail-closed guard"; safe *placement* around fenced
+  markers stays deferred.
+
+Proven by **124 checks on Python 3.12.7** (5 suites), including a committed read-only test
+(`tests/workflow/test_seed_docs.py`) that simulates a publish against the *actual committed* docs and asserts
+byte-identity — the real docs are valid publish targets, unmutated. The red-team — the Step-4 team plus four
+convergence rounds — found and fixed **eleven blocking defects** (see DECISIONS 2026-07-15); residual risks in
+RISKS #10/#11/#13/#14/#15.
+
+**Live-challenger smoke-test passed at Step 5 (2026-07-15) — the owed item, discharged.** The suite's row tests
+exercise the deterministic chain with a *scripted* challenger; the M2→M3 pattern owed a **live** run. All four
+new rows were then walked with **real spawned Sonnet challengers** against sandbox copies of the real docs:
+4/4 echoed a fresh canary verbatim, every publish was byte-surgical, twelve refusals fired, and the three
+publishing rows advanced through the gate without `--force`. It found **two things the deterministic suite
+structurally could not** — a scripted challenger does only what it is told, a live one reads its whole
+environment: the stale-`challenge.md` contamination (**fixed**, above) and RISKS **#15** (later steps challenge
+a record that lacks every earlier correction — **not** a code bug; deferred to M5).
+
+<!-- WF:arch:workflow-machinery:end -->

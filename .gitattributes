@@ -2,3 +2,8 @@
 # stray CRLF would make Linux/macOS fail to launch `./sync.py` ("bad interpreter: python3\r").
 # Editing on Windows won't reintroduce CRLF because of this rule.
 *.py text eol=lf
+
+# Force LF on all Markdown too. The workflow `publish` engine writes settled prose into these
+# docs and preserves whatever newline style it finds; pinning docs to LF keeps that stable across
+# machines (Windows editors won't reintroduce CRLF) and closes RISKS #10 for docs.
+*.md text eol=lf

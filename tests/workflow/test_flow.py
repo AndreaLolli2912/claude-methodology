@@ -28,7 +28,7 @@ NEED = TMP / "docs" / "draft-need.md"
 OVERVIEW = TMP / "docs" / "OVERVIEW.md"
 CONTEXT = WF / "context.md"
 CHALLENGE = WF / "challenge.md"
-ENTRY = WF / "overview-entry.md"
+ENTRY = WF / "publish-entry.md"
 
 checks = []
 
@@ -51,11 +51,18 @@ def canary():
     return None
 
 
-# Scaffold a minimal OVERVIEW with the anchor the publish half targets.
-OVERVIEW.write_text("# Overview\n\n## Current status\n\n**2026-01-01** - seed entry.\n", encoding="utf-8")
+# Scaffold a minimal OVERVIEW with the SEEDED anchor the publish half targets. In M4 the
+# anchor is a comment sentinel (<!-- WF:anchor:<slug> -->), NOT the heading text - headings
+# drift and collide, so the engine keys off a seeded marker (see the publish engine).
+OVERVIEW.write_text(
+    "# Overview\n\n## Current status\n\n<!-- WF:anchor:current-status -->\n\n"
+    "**2026-01-01** - seed entry.\n", encoding="utf-8")
+ANCHOR = "<!-- WF:anchor:current-status -->"
 
 # 1) start -> 2) draft -> 3) prepare -> 4) challenger writes result -> 5) record
 run("start", "End-to-end need")
+task_id = workflow.load_marker()["task_id"]                  # the log-block scope is this task's id
+need_start = "<!-- WF:need:{}:start -->".format(task_id)     # M4 both-ends-identity marker
 NEED.write_text("# Need\nThe toy need, drafted for the flow test.\n", encoding="utf-8")
 run("prepare", "need")
 CHALLENGE.write_text("## COLD verdict\nlooks ok. canary: {}\n\n## WARM verdict\nok\n".format(canary()),
@@ -68,10 +75,10 @@ ENTRY.write_text("**2026-07-14** - Need settled: the machinery must prove the pa
                  encoding="utf-8")
 rc, _, _ = run("publish", "need")
 doc = OVERVIEW.read_text(encoding="utf-8")
-check("2 publish auto-docs the settled Need into OVERVIEW under the anchor",
+check("2 publish auto-docs the settled Need into OVERVIEW under the seeded anchor, newest-first",
       rc == 0 and "Need settled: the machinery" in doc
-      and doc.index("<!-- WF:need:start") > doc.index("## Current status")
-      and doc.index("<!-- WF:need:start") < doc.index("seed entry"))
+      and doc.index(need_start) > doc.index(ANCHOR)
+      and doc.index(need_start) < doc.index("seed entry"))
 
 # 7) advance - the gate opens because the receipt is fresh
 rc, _, _ = run("advance")
@@ -79,7 +86,8 @@ check("3 advance opens on the fresh receipt (need -> design)", rc == 0 and workf
 
 # The whole chain settled one step end to end with both outputs (receipt + auto-doc).
 check("4 both outputs present: fresh receipt recorded AND the OVERVIEW block written",
-      "need" in workflow.load_marker().get("receipts", {}) and OVERVIEW.read_text(encoding="utf-8").count("<!-- WF:need:start") == 1)
+      "need" in workflow.load_marker().get("receipts", {})
+      and OVERVIEW.read_text(encoding="utf-8").count(need_start) == 1)
 
 shutil.rmtree(TMP, ignore_errors=True)
 

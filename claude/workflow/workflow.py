@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""workflow.py - the spine of the six-step-workflow machinery (M3 walking skeleton: Need slice).
+"""workflow.py - the spine of the six-step-workflow machinery (M4: the complete step set).
 
 WHY this file exists: the whole design rests on one idea - a *deterministic script*, not the
 model, is the single author of every "did this really happen?" signal. The model does the
@@ -12,9 +12,11 @@ It is BOTH a command-line tool (verbs: start / prepare / record / advance / stat
 publish) AND an importable library (load_marker + receipt_state), so the status line and hooks
 (M5) will read the *exact same* freshness logic instead of re-implementing it and drifting.
 
-Scope (M3): the *Need slice* only - one RECIPE row ("need") and one publish target (OVERVIEW).
-Adding the other four review-style steps is a new RECIPE row each (M4); Step 4 (Implementation)
-is the exception - its team of attackers does not use this canary/receipt machinery (also M4).
+Scope (M4): the publish half is now a data-driven engine (_place_block) that writes real doc
+SHAPES - log-accumulate (prepend, per-task) and sectioned replace-or-create (append, per-slug) -
+via both-ends-identity markers and seeded per-location anchors; the four review-style rows are
+added as data. Step 4 (Implementation) and Shipping are the publish exceptions (Implementation's
+team of attackers + code output; Shipping writes no doc - its docs stay human-curated).
 Standard library only, ASCII source, to run on any of the developer's machines with zero installs.
 """
 
@@ -42,9 +44,10 @@ WF = ROOT / ".workflow"               # runtime state dir (gitignored, ephemeral
 MARKER = WF / "marker.json"           # the one state file the whole system reads
 CONTEXT = WF / "context.md"           # the bundle `prepare` hands the challenger
 CHALLENGE = WF / "challenge.md"       # where the challenger writes its verdicts back
-ENTRY = WF / "overview-entry.md"      # the model's drafted prose that `publish` places
-#                                       (the "overview-" name is OVERVIEW-specific: this is the
-#                                       publish-half v0, which does not yet generalize - see M4.)
+ENTRY = WF / "publish-entry.md"       # the model's drafted settled-prose that `publish` places -
+#                                       EVERY publishing step drafts here (need/design/architecture/
+#                                       judgment), which is why the name is publish-, not overview-: it
+#                                       served only Need -> OVERVIEW in M3, before the engine generalized.
 
 # The six steps, in order. "Where are we?" is just an index into this list, held
 # in the marker - NOT inferred from which docs are filled (those are full across
@@ -63,16 +66,22 @@ def artifact_path(step):
 
 # ---------------------------------------------------------------------------
 # The per-step RECIPE - the ONE place in this script that is step-aware, so
-# nothing else has to be. Two halves of very different reach (see ARCHITECTURE
-# "M3 walking skeleton - the Need slice"):
+# nothing else has to be. Two halves (see ARCHITECTURE "M4 - completing the step
+# set: the publish engine"):
 #   * challenge-context half (cold_sources / warm_sources / attack_angles):
-#     a FROZEN contract the five review-style steps reuse by adding a row;
-#     consumed by `prepare`.
-#   * publish half (publish: {...}): a v0 seeded on ONE single-writer-prose
-#     slice (Need -> OVERVIEW); consumed by `publish`. It does NOT generalize
-#     as-is - M4 must enrich it (region-anchoring, list targets, a code mode).
-# M3 fills only the "need" row. Step 4 (Implementation) is BOTH halves' named
-# exception -> M4.
+#     a FROZEN contract every review-style step shares - identical COLD/WARM
+#     sources (defined ONCE just below, so a row cannot silently drift), and only
+#     the per-step attack angles differ (the "specialist per step"). Consumed by
+#     `prepare`.
+#   * publish half (publish: {...}): WHERE this step's settled prose lands and in
+#     which SHAPE - `mode:log` (accumulate, newest-first) or `mode:section`
+#     (replace-or-create one section per component). Consumed by `publish` via the
+#     _place_block engine. `mode` is enforced there, so a mis-moded row fails loud.
+# The five review-style steps each get a row; `implementation` gets NO row - it is
+# the deferred exception (its team-of-attackers + code output is a different attack
+# mechanism, not this prose challenge). `shipping` has a challenge half but NO
+# publish half (the SECOND publish exception - its docs stay human-curated, because
+# no valid single-writer auto-target exists; M4 Design, Decision 3).
 #
 # Source tokens (resolved by _resolve_sources) - the small vocabulary a recipe
 # draws from, so adding a step is DATA, not new code (proof #4, replication):
@@ -81,28 +90,115 @@ def artifact_path(step):
 #   "operator"      -> docs/OPERATOR.md (how this developer actually works)
 #   "global_habits" -> the hand-filled global-habits slot (usually empty)
 # ---------------------------------------------------------------------------
+
+# The FROZEN challenge-context sources, shared by every review-style step. Defined
+# once and referenced by each row below, so "frozen contract" is structural (there
+# is a single definition to read) rather than a copy-paste discipline that can rot.
+# COLD = the step's own draft + all prior settled drafts (fresh-eyes read); WARM =
+# the operator facts + the global-habits slot (habit/domain-specific pass). What
+# each token RESOLVES to is step-position-aware (see _resolve_sources), so the same
+# two lists produce the right per-step context without varying the data.
+_REVIEW_COLD_SOURCES = ["artifact", "prior_settled"]
+_REVIEW_WARM_SOURCES = ["operator", "global_habits"]
+
 RECIPE = {
     "need": {
-        # challenge-context half (cold read = the draft + the settled record; warm
-        # adds the operator facts). Frozen shape the other review-style steps reuse.
-        "cold_sources": ["artifact", "prior_settled"],
-        "warm_sources": ["operator", "global_habits"],
+        "cold_sources": _REVIEW_COLD_SOURCES,
+        "warm_sources": _REVIEW_WARM_SOURCES,
         "attack_angles": [
             "What need is missing, or is true but was never said aloud?",
             "What must this explicitly NOT do?",
             "Who is the real user - and is that assumption right?",
             "What is assumed about the problem that might be false?",
         ],
-        # publish half (v0): the settled Need prose lands in OVERVIEW, between the
-        # WF:need sentinels, prepended under the "## Current status" heading. `mode`
-        # is read (and enforced) by `publish`, so a future mis-moded row fails loud.
+        # The settled Need prose accumulates in OVERVIEW under the shared
+        # "current-status" anchor, newest-first, one WF:need:<task_id> block per task.
         "publish": {
-            "mode": "prose_sentinel",
+            "mode": "log",                    # accumulate: prepend newest-first, per-task scope
             "doc_target": "docs/OVERVIEW.md",
-            "sentinel_key": "need",
-            "anchor": "## Current status",
+            "block_key": "need",              # WF:need:<task_id> blocks
+            "anchor_slug": "current-status",  # under the seeded WF:anchor:current-status
         },
     },
+    "design": {
+        "cold_sources": _REVIEW_COLD_SOURCES,
+        "warm_sources": _REVIEW_WARM_SOURCES,
+        "attack_angles": [
+            "Why might the chosen option be the wrong one?",
+            "What trade-off is being quietly glossed over?",
+            "What stronger option was never put on the table?",
+            "What does this approach make expensive or hard to change later?",
+        ],
+        # Decisions accumulate in DECISIONS newest-first (one WF:design:<task_id>
+        # block per task) under the seeded "decisions-log" anchor - DECISIONS has no
+        # `##` heading to anchor on, which is exactly why the anchor is a seeded
+        # comment, not heading text (M4 Architecture, Decision 4).
+        "publish": {
+            "mode": "log",
+            "doc_target": "docs/DECISIONS.md",
+            "block_key": "design",
+            "anchor_slug": "decisions-log",
+        },
+    },
+    "architecture": {
+        "cold_sources": _REVIEW_COLD_SOURCES,
+        "warm_sources": _REVIEW_WARM_SOURCES,
+        "attack_angles": [
+            "Does this pattern truly fit THIS problem, or is it familiar-by-default?",
+            "Which boundary is in the wrong place - and what leaks across it?",
+            "What breaks when one part changes? Are the contracts actually stable?",
+            "What did the textbook shape carry in that we do not need here?",
+        ],
+        # ARCHITECTURE is sectioned: one replace-or-create block per component, kept
+        # in stable order under the "architecture-sections" anchor. block_key is
+        # "arch" (deliberately NOT "architecture"; M4 Architecture, Decision 2), so
+        # the sentinels stay short and can never collide with the step name.
+        "publish": {
+            "mode": "section",
+            "doc_target": "docs/ARCHITECTURE.md",
+            "block_key": "arch",
+            "anchor_slug": "architecture-sections",
+        },
+    },
+    "judgment": {
+        "cold_sources": _REVIEW_COLD_SOURCES,
+        "warm_sources": _REVIEW_WARM_SOURCES,
+        "attack_angles": [
+            "Which part of the proof only covers the happy path?",
+            "Which stated need was never actually confirmed?",
+            "Where does the evidence rest on optimism, not observation?",
+            "What would have to be true for this 'done' to be false?",
+        ],
+        # The macro verdict accumulates in OVERVIEW status under the SAME
+        # "current-status" anchor as Need, so a task's Need and its later Judgment
+        # interleave newest-first under one location - the shared-anchor design
+        # (anchors are per-location, not per-key; M4 Design, Decision 5).
+        "publish": {
+            "mode": "log",
+            "doc_target": "docs/OVERVIEW.md",
+            "block_key": "judgment",
+            "anchor_slug": "current-status",
+        },
+    },
+    "shipping": {
+        # NO publish half - the SECOND exception alongside `implementation` (M4
+        # Design, Decision 3). Shipping still runs prepare -> challenge -> record
+        # (it earns a receipt like any step), but writes NO doc automatically:
+        # RISKS / PLAYBOOK / CHANGELOG / the commit stay human-curated, because no
+        # valid single-writer auto-target exists. `cmd_publish` refuses a step whose
+        # recipe has no "publish" key, so this omission is enforced, not just documented.
+        "cold_sources": _REVIEW_COLD_SOURCES,
+        "warm_sources": _REVIEW_WARM_SOURCES,
+        "attack_angles": [
+            "What works in the chat but breaks under real load or scale?",
+            "What environment assumption is baked in and unstated?",
+            "What is the rollback if this goes wrong - and has it been shown?",
+            "Which failure mode is unhandled and unrecorded?",
+        ],
+    },
+    # `implementation` intentionally has NO row: it is the deferred exception whose
+    # attack mechanism (a team of built-in + fidelity attackers over real code) is
+    # not this prose challenge. `prepare`/`publish` fail-closed on it by design.
 }
 
 
@@ -300,8 +396,9 @@ def cmd_prepare(args):
         return _fail("current step is '{}', not '{}'.".format(marker["current_step"], step))
     recipe = RECIPE.get(step)
     if not recipe:
-        return _fail("no recipe for step '{}' - M3 builds only the Need slice "
-                     "(the other steps are M4).".format(step))
+        return _fail("no recipe for step '{}' - only `implementation` has no recipe "
+                     "(its team-of-attackers mechanism is deferred; every other step has one)."
+                     .format(step))
 
     # Fail-closed on a missing rulebook: A-1 was chosen precisely so the rules cannot
     # be silently absent from the one file the challenger reads. No rulebook, no bundle.
@@ -347,6 +444,31 @@ def cmd_prepare(args):
 
     bundle = "".join(out)
     WF.mkdir(exist_ok=True)
+
+    # Clear the PREVIOUS round's challenger result before this round's challenger runs (live
+    # smoke-test finding L2 - the exact mirror of CB1's leftover-ENTRY bug, one file over).
+    # `record` cannot be fooled by a stale result (this prepare plants a fresh canary, and a
+    # stale file echoes the old one -> rejected), so this is not a receipt-integrity hole. It is
+    # a CONTEXT-INTEGRITY one: the challenger is told to WRITE this path, so it reads whatever
+    # is already there. Two live challengers did exactly that, then reported the previous
+    # round's findings back as "cross-round corroboration" - contamination dressed up as
+    # independent confirmation, which is precisely what "a fresh challenger each step" exists to
+    # prevent. Clearing here is the only point that is after the challenger's last run and
+    # before the next one's.
+    # Fail CLOSED if it survives: prepare's whole job is to hand over a clean bundle, so if the
+    # directory cannot be made clean we write no bundle and plant no pending - nothing is
+    # prepared, exactly as when the rulebook is missing. This sits AFTER every validation check
+    # above on purpose: a REFUSED prepare must not have the side effect of destroying the
+    # previous round's result. A benign "already gone" is the normal case.
+    try:
+        CHALLENGE.unlink()
+    except FileNotFoundError:
+        pass
+    except OSError as exc:
+        return _fail("prepared nothing: could not clear the previous challenger result ({}) - the "
+                     "next challenger would read it as context and lose its independence. Close "
+                     "whatever holds {} and re-run prepare.".format(exc, CHALLENGE))
+
     # Write bytes so the file matches the string we hash below exactly (no newline
     # translation), consistent with _atomic_write_text.
     CONTEXT.write_bytes(bundle.encode("utf-8"))
@@ -399,6 +521,26 @@ def cmd_record(args):
         return _fail("artifact for '{}' changed between prepare and record - the challenge ran on "
                      "different bytes. Re-prepare and re-challenge. No receipt written.".format(step))
 
+    # CB1 (correctness red-team): the publish gate certifies the *artifact* (the draft) was
+    # challenged, but the text `publish` actually writes comes from ENTRY (publish-entry.md), which
+    # is never tied to the receipt. Clear any LEFTOVER entry BEFORE writing the receipt, so a stale
+    # draft from a PREVIOUS round can never publish under the fresh receipt we are about to write -
+    # the model must draft a fresh entry (conductor step 6) after each record. If the entry EXISTS
+    # but cannot be removed (locked by an editor / AV / sync), that is a real failure: fail closed
+    # WITHOUT writing the receipt, so no fresh receipt exists and publish's gate refuses - never
+    # silently leave a stale entry that could publish (convergence red-team B2, the same way
+    # `reset` treats an undeletable file as reportable). A benign "no entry" is the normal case.
+    # The inherent residual (a fresh-but-divergent entry - a post-settle summary that cannot be
+    # hash-compared to the draft) is model-authored + human-reviewed and is documented (RISKS #13).
+    try:
+        ENTRY.unlink()
+    except FileNotFoundError:
+        pass
+    except OSError as exc:
+        return _fail("recorded nothing: could not clear a leftover drafted entry ({}) - a stale "
+                     "entry could otherwise publish under a fresh receipt. Close whatever holds {} "
+                     "and re-run record.".format(exc, ENTRY))
+
     marker.setdefault("receipts", {})[step] = {
         "challenge_ran": True,           # self-reported: "the model reports it ran" - never "verified"
         "context_hash": pending["context_hash"],
@@ -447,16 +589,213 @@ def cmd_advance(args):
     return 0
 
 
-def cmd_publish(args):
-    """Auto-docs writer (Decision D-1). The model drafts the settled-step prose into
-    .workflow/overview-entry.md; THIS verb places it into the real doc between stable
-    sentinels (Design beta-2), so the model owns the wording and the script owns the
-    placement/replace. It is the ONLY verb that writes a committed doc, so it is
-    FAIL-CLOSED: anything ambiguous refuses rather than risk corrupting a real document.
+# ---------------------------------------------------------------------------
+# The publish engine (M4). The M3 publish did ONE thing (prepend/replace a
+# key-only sentinel block under a heading anchor). M4 generalizes it to the real
+# document SHAPES the review steps write, but keeps it ONE engine:
+#   * markers carry the full identity (key, scope) on BOTH ends, so one task's or
+#     section's block can never match another's (the M3 start-only format could -
+#     a second task would clobber the first; RISKS #12 key-half);
+#   * a single _place_block owns identity-matching + the fail-closed guard +
+#     replace-in-place; the ONLY thing that varies is where a BRAND-NEW block is
+#     inserted - prepended for logs (newest-first) or appended for reference
+#     sections (stable order, so a section never jumps when it is edited);
+#   * anchors are SEEDED per-location comments (WF:anchor:<slug>), not prose
+#     headings - DECISIONS has no stable heading, and headings drift and collide
+#     (M4 Architecture, Decision 5). Shared across keys, so e.g. Need and Judgment
+#     interleave under one OVERVIEW anchor.
+# Everything stays column-0 whole-line + fail-closed: anything ambiguous refuses
+# rather than risk corrupting a real committed doc.
+# ---------------------------------------------------------------------------
 
-    Two paths: FIRST WRITE (no sentinel pair yet) prepends the block newest-first under
-    the anchor heading; RE-SETTLE (one pair) replaces the content in place, so re-running
-    is structurally idempotent (no duplicate block - proof #2)."""
+# A scope is a hex task_id or a section-slug. The settled grammar (M4 Architecture,
+# Decision C) is lowercase kebab - hex task_ids and human slugs both fit. Constrained
+# to this charset (and re.escape'd anyway) so a slug can NEVER inject regex.
+_SCOPE_RE = r"[a-z0-9-]+"
+
+# Any standalone column-0 WF marker line - a block start/end OR an anchor, ANY
+# key/scope. The key-AGNOSTIC entry guard uses this (RISKS #12 second half): a
+# drafted entry may MENTION marker syntax inline in backticks (these very docs
+# do), but a whole-line column-0 marker in the entry would inject bogus structure.
+_ANY_MARKER_LINE = re.compile(r"(?m)^<!--\s*WF:[^\n]*?-->[ \t]*$")
+
+# Any seeded anchor line (any slug) - used to BOUND append_section to one anchor's
+# region, so a new section can never land under a different anchor.
+_ANY_ANCHOR_LINE = re.compile(r"(?m)^<!-- WF:anchor:" + _SCOPE_RE + r" -->[ \t]*$")
+
+# A Markdown code-fence delimiter line: 3+ backticks OR 3+ tildes, indented 0-3 spaces (all
+# CommonMark-legal). Group 1 is the delimiter run - its character and length identify the fence;
+# group 2 is the remainder (an info string on an opener, or - for a valid CLOSER - whitespace only).
+_FENCE_LINE = re.compile(r"^ {0,3}(`{3,}|~{3,})(.*)$")
+
+
+class _PublishError(Exception):
+    """Raised by the publish engine on any fail-closed condition. cmd_publish turns
+    it into a _fail() - no write, non-zero, visible - so a torn or ambiguous publish
+    can never silently corrupt a committed doc."""
+
+
+def _block_markers(key, scope):
+    """The exact start/end comment lines the engine WRITES for a (key, scope) block.
+    Both ends carry the identity, so finding one block can never grab another's."""
+    return ("<!-- WF:{}:{}:start -->".format(key, scope),
+            "<!-- WF:{}:{}:end -->".format(key, scope))
+
+
+def _block_patterns(key, scope):
+    """Column-0 whole-line regexes for THIS (key, scope) block's two markers - the
+    exact shape _block_markers writes. re.escape so nothing in key/scope is special."""
+    start, end = _block_markers(key, scope)
+    return (re.compile(r"(?m)^" + re.escape(start) + r"[ \t]*$"),
+            re.compile(r"(?m)^" + re.escape(end) + r"[ \t]*$"))
+
+
+def _anchor_pattern(slug):
+    """Column-0 whole-line regex for the seeded WF:anchor:<slug> location marker."""
+    return re.compile(r"(?m)^" + re.escape("<!-- WF:anchor:{} -->".format(slug)) + r"[ \t]*$")
+
+
+def _key_end_pattern(key):
+    """Column-0 end markers for ANY scope of `key` - append_section uses this to find
+    the tail of the managed-section group so a new section lands after the last one."""
+    return re.compile(r"(?m)^" + re.escape("<!-- WF:{}:".format(key)) + _SCOPE_RE
+                      + re.escape(":end -->") + r"[ \t]*$")
+
+
+def _entry_has_marker_line(entry):
+    """True if the drafted entry contains a standalone column-0 WF marker line (any
+    key/scope, block or anchor). Key-AGNOSTIC (RISKS #12 second half): an entry that
+    merely quotes marker syntax inline is fine; a whole-line marker would inject
+    structure into the real doc and is refused."""
+    return _ANY_MARKER_LINE.search(entry) is not None
+
+
+def _wf_marker_in_fence(doc):
+    """True if any column-0 WF marker/anchor line sits INSIDE a Markdown code fence. We cannot
+    safely count or place around markers when a doc quotes them as fenced examples, so publish
+    REFUSES (fail-closed) - the settled RISKS #12 ruling (a cheap fail-closed guard now; safe
+    *placement* around fenced markers stays deferred).
+
+    This tracks the OPENING fence's character and length, per CommonMark: a fence opened by N
+    backticks (or tildes) closes only on a line of the SAME character, at least N long, with
+    nothing after but whitespace. A run of the *other* character, or a shorter run, or one with
+    trailing text is literal CONTENT - not a closer. Tracking this matters (convergence red-team
+    B1): a naive 'toggle on any ```/~~~ run' desyncs on a mismatched delimiter, which both HIDES
+    a marker inside a fence (fail-open) AND wrongly flags a later free marker as fenced (a false
+    fail-closed) for the rest of the doc. We still only flag a COLUMN-0 WF marker inside a fence,
+    because only column-0 markers can fool the positional scans; an indented one can't. Real
+    project docs have no such fences (grep-verified), so this never fires in practice; it exists
+    so a doc that DOES grow one can never be silently mis-edited."""
+    fence = None   # None, or (char, length) of the currently-open fence
+    for line in doc.split("\n"):
+        m = _FENCE_LINE.match(line)
+        if m:
+            run, rest = m.group(1), m.group(2)
+            char, length = run[0], len(run)
+            if fence is None:
+                # Open a fence. CommonMark exception: a BACKTICK opener's info string may NOT
+                # contain a backtick - if it does, the line is not a fence at all, just ordinary
+                # content, so a marker after it is genuinely free (convergence round-2 BLOCKING #2:
+                # treating such a line as a fence false-refused a legitimate doc).
+                if not (char == "`" and "`" in rest):
+                    fence = (char, length)
+            elif char == fence[0] and length >= fence[1] and rest.strip(" \t") == "":
+                fence = None                              # valid closer (CommonMark: ONLY spaces/tabs
+                #   may follow a closer - str.strip() with no args would also eat form-feed / NBSP /
+                #   C0 separators, wrongly closing the fence early and exposing a marker: round-4 fail-open)
+            # else: different char / shorter run / trailing text -> literal content, ignore
+        elif fence is not None and line.startswith("<!--") and "WF:" in line:
+            return True
+    return False
+
+
+def _place_block(doc, block_key, scope, anchor_slug, placement, body):
+    """Insert-or-replace THIS (block_key, scope) block in `doc` (LF-space text) and
+    return the new text - or raise _PublishError on ANY ambiguity (fail-closed).
+
+    - Count MY (block_key, scope) markers: 0 pairs -> insert a new block; 1 pair ->
+      replace it in place; any other count (orphan start/end, or a duplicate such as
+      a same-scope marker sitting in a code fence) -> refuse. This shared count is
+      also the fence guard: a stray same-scope fenced marker makes the count 2 and
+      the write refuses rather than corrupting.
+    - A NEW block's position depends on `placement`:
+        'prepend'        -> right under the seeded anchor (newest-first: logs).
+        'append_section' -> after the last existing WF:<block_key>:* block that
+                            follows the anchor (stable order: reference sections);
+                            if none exist yet, right under the anchor.
+    """
+    # Normalize ALL CommonMark line terminators to LF - CRLF *and* a lone CR - before interpreting
+    # lines. A bare CR is a line ending per CommonMark, but str.split("\n") and re.MULTILINE treat
+    # only \n as one, so a bare \r before a fence delimiter (or a marker) desyncs the fence guard,
+    # hiding a fenced marker (fail-open) or flagging a free one (false-refuse) (convergence round-3).
+    # This function interprets lines, so it owns the normalization for EVERY caller (a direct caller
+    # that hands in bare CRs is otherwise silently mis-parsed). LF is re-applied by cmd_publish on write.
+    doc = doc.replace("\r\n", "\n").replace("\r", "\n")
+    if _wf_marker_in_fence(doc):
+        raise _PublishError("target has a WF: marker line inside a ``` code fence - refusing "
+                            "(cannot safely place around fenced marker examples).")
+    start_pat, end_pat = _block_patterns(block_key, scope)
+    n_start, n_end = len(start_pat.findall(doc)), len(end_pat.findall(doc))
+    if n_start != n_end:
+        raise _PublishError("malformed markers for WF:{}:{} - {} start(s) vs {} end(s)."
+                            .format(block_key, scope, n_start, n_end))
+    if n_start > 1:
+        raise _PublishError("more than one WF:{}:{} block - refusing.".format(block_key, scope))
+
+    start_marker, end_marker = _block_markers(block_key, scope)
+    block = "{}\n{}\n{}".format(start_marker, body, end_marker)
+
+    # Re-settle: replace the one existing block in place (identical for both modes).
+    if n_start == 1:
+        m_start, m_end = start_pat.search(doc), end_pat.search(doc)
+        if m_end.start() < m_start.start():
+            raise _PublishError("end precedes start for WF:{}:{} - refusing."
+                                .format(block_key, scope))
+        return doc[:m_start.start()] + block + doc[m_end.end():]
+
+    # Insert a NEW block: locate the seeded anchor (fail-closed on missing/duplicate).
+    anchor_pat = _anchor_pattern(anchor_slug)
+    n_anchor = len(anchor_pat.findall(doc))
+    if n_anchor != 1:
+        raise _PublishError("expected exactly one WF:anchor:{}, found {} - refusing."
+                            .format(anchor_slug, n_anchor))
+    m_anchor = anchor_pat.search(doc)
+
+    if placement == "prepend":
+        at = m_anchor.end()
+    elif placement == "append_section":
+        # Append after the last WF:<block_key>:* end-marker in THIS anchor's region -
+        # from the anchor to the next WF:anchor: (or EOF) - so a section under anchor X
+        # can never land under a different anchor Y. No managed block yet -> right under
+        # the anchor. (Fenced decoys are already excluded: _wf_marker_in_fence made the
+        # whole publish fail-closed at the top.)
+        region_end = len(doc)
+        for m in _ANY_ANCHOR_LINE.finditer(doc):
+            if m.start() > m_anchor.end():
+                region_end = m.start()
+                break
+        at = m_anchor.end()
+        for m in _key_end_pattern(block_key).finditer(doc):
+            if m_anchor.end() < m.start() < region_end:
+                at = m.end()
+    else:
+        raise _PublishError("unknown placement {!r}.".format(placement))
+    return doc[:at] + "\n\n" + block + doc[at:]
+
+
+def cmd_publish(args):
+    """Auto-docs writer (Decision D-1, generalized in M4). The model drafts the
+    settled-step prose into .workflow/publish-entry.md; THIS verb places it into the
+    real doc via the publish engine (_place_block), so the model owns the wording and
+    the script owns placement/replace. It is the ONLY verb that writes a committed
+    doc, so it is FAIL-CLOSED throughout: anything ambiguous refuses.
+
+    Two modes, read from the step's RECIPE publish half:
+      * 'log'     -> scope = this task's id, placement = prepend (accumulate across
+                     tasks under a shared anchor; DECISIONS, OVERVIEW status).
+      * 'section' -> scope = a --section slug, placement = append_section (one
+                     section per component; --new/--update intent guards a mistargeted
+                     write; ARCHITECTURE)."""
     marker = load_marker()
     if not marker:
         return _fail("no task open (run `start` first).")
@@ -465,12 +804,24 @@ def cmd_publish(args):
     if not recipe or "publish" not in recipe:
         return _fail("no publish target for step '{}'.".format(step))
     pub = recipe["publish"]
-    if pub.get("mode") != "prose_sentinel":
-        # Only one mode exists in M3; a future differently-moded row must add its branch
-        # rather than silently fall through to this one.
-        return _fail("unsupported publish mode {!r} for step '{}'.".format(pub.get("mode"), step))
+    mode = pub.get("mode")
+    if mode not in ("log", "section"):
+        return _fail("unsupported publish mode {!r} for step '{}'.".format(mode, step))
 
-    # 1) The model's drafted entry must exist and be non-empty (fail-closed on input).
+    # Gate (the honest floor): publish is the ONLY verb that writes a committed doc, so it
+    # must refuse an unchallenged or non-current step. Require the step to BE current AND to
+    # hold a FRESH receipt (the challenge ran against the artifact on disk) - the same honesty
+    # the advance-gate enforces. Closes a publish-without-challenge and a republish-after-
+    # advance path, either of which would write unvouched content into a real doc.
+    if step != marker.get("current_step"):
+        return _fail("current step is '{}', not '{}' - refusing to publish a non-current step."
+                     .format(marker.get("current_step"), step))
+    state = receipt_state(step, marker)
+    if state != "fresh":
+        return _fail("step '{}' has no fresh receipt (state: {}) - run the challenge and `record` "
+                     "before publishing.".format(step, state))
+
+    # 1) The drafted entry: exists, non-empty, and carries no injected marker line.
     try:
         entry = ENTRY.read_text(encoding="utf-8").strip() if ENTRY.exists() else ""
     except (OSError, UnicodeDecodeError):
@@ -478,85 +829,86 @@ def cmd_publish(args):
     if not entry:
         return _fail("no drafted entry at {} (write the settled prose there first). "
                      "Nothing published.".format(ENTRY))
-    entry = entry.replace("\r\n", "\n")   # normalize to LF; the doc's own style is re-applied on write
+    entry = entry.replace("\r\n", "\n")   # LF space; the doc's own newline is re-applied on write
+    if _entry_has_marker_line(entry):
+        return _fail("the drafted entry contains a standalone WF: marker line - refusing "
+                     "(it would inject bogus structure). Remove column-0 WF: comment lines.")
 
-    # 2) The target doc must already exist - we place INTO a real scaffolded doc, never
-    #    create one from nothing. Read preserving newlines, then work in LF space and
-    #    restore the doc's original newline style on write (so a Windows publish can't
-    #    silently flip the whole file LF<->CRLF).
+    # 2) Resolve scope + placement from the mode (and, for sections, the CLI intent).
+    block_key = pub["block_key"]
+    anchor_slug = pub["anchor_slug"]
+    if mode == "log":
+        if args.section or args.new or args.update:
+            return _fail("--section/--new/--update are section-mode only; step '{}' publishes a log."
+                         .format(step))
+        scope = marker.get("task_id", "unknown")
+        placement = "prepend"
+    else:   # section
+        if not args.section:
+            return _fail("step '{}' publishes a section; --section <slug> is required.".format(step))
+        if not re.fullmatch(_SCOPE_RE, args.section):
+            return _fail("--section slug {!r} must match {}.".format(args.section, _SCOPE_RE))
+        if bool(args.new) == bool(args.update):
+            return _fail("section publish needs exactly one of --new / --update.")
+        scope = args.section
+        placement = "append_section"
+
+    # 3) The target doc must already exist - place INTO a real doc, never create one.
+    #    Raw bytes preserve newlines on any Python 3; work in LF space and restore the
+    #    doc's newline style on write (so a Windows publish can't flip the whole file).
     target = ROOT / pub["doc_target"]
     try:
-        raw = target.read_bytes().decode("utf-8")   # bytes: preserve exact newlines on any Python 3
+        raw = target.read_bytes().decode("utf-8")
     except FileNotFoundError:
         return _fail("publish target {} does not exist. Nothing published.".format(target))
     except (OSError, UnicodeDecodeError):
         return _fail("publish target {} is unreadable. Nothing published.".format(target))
     doc_nl = "\r\n" if "\r\n" in raw else "\n"
-    doc = raw.replace("\r\n", "\n")
+    # Normalize ALL CommonMark line terminators to LF (CRLF *and* a lone CR), not just CRLF, so the
+    # section-count check below and _place_block interpret lines exactly as a Markdown renderer does.
+    # A bare \r before a fence delimiter otherwise hides/false-flags a marker (convergence round-3).
+    # A rare bare-CR doc thus normalizes to LF on write (doc_nl is LF when no CRLF is present) -
+    # acceptable and consistent with the existing newline homogenization (RISKS #10; docs pinned LF).
+    doc = raw.replace("\r\n", "\n").replace("\r", "\n")
 
-    key = pub["sentinel_key"]
-    task_id = marker.get("task_id", "unknown")
-    # A sentinel is recognized ONLY as a standalone comment line AT COLUMN 0 - the exact
-    # shape this verb itself writes (start_full/end_marker are spliced flush-left). That rules
-    # out two false positives that would otherwise let publish overwrite the wrong thing:
-    # an INLINE mention of the marker syntax mid-line (this project's docs quote it in
-    # backticks) is ignored; and an INDENTED example of a marker (e.g. in a how-it-works
-    # block) is ignored too - a real marker is never indented, so an example can't be mistaken
-    # for the live block. (A column-0 sentinel-shaped line standing alone inside a ``` code
-    # fence WOULD still match - a real-system caveat, not something a fresh init-project-docs
-    # OVERVIEW contains.) `start_full` is what we WRITE; the patterns are what we SEARCH
-    # (task-agnostic, so re-settle finds a block a prior task wrote).
-    start_line = re.compile(r"(?m)^<!-- WF:" + re.escape(key) + r":start[^\n]*?-->[ \t]*$")
-    end_line = re.compile(r"(?m)^<!-- WF:" + re.escape(key) + r":end -->[ \t]*$")
-    # The anchor must be the WHOLE heading line (modulo trailing spaces), not a prefix, so a
-    # heading like "## Current status archive" can't be mistaken for "## Current status" and
-    # misplace the block. If the exact heading is absent, first-write fails closed (below).
-    anchor_line = re.compile(r"(?m)^" + re.escape(pub["anchor"]) + r"[ \t]*$")
-    start_full = '<!-- WF:{}:start task="{}" -->'.format(key, task_id)
-    end_marker = "<!-- WF:{}:end -->".format(key)
+    # 4) Section intent check (fail-closed on count mismatch) - turns a mistargeted
+    #    --section into a refusal, not a silent overwrite of the wrong section.
+    if mode == "section":
+        start_pat, _ = _block_patterns(block_key, scope)
+        existing = len(start_pat.findall(doc))
+        if args.new and existing != 0:
+            return _fail("--new but WF:{}:{} already exists ({} found). Refusing."
+                         .format(block_key, scope, existing))
+        if args.update and existing != 1:
+            return _fail("--update but WF:{}:{} has {} match(es) (need exactly 1). Refusing."
+                         .format(block_key, scope, existing))
 
-    # The drafted prose must not itself contain a sentinel line, or it would inject a
-    # second, bogus pair. Refuse rather than write malformed structure.
-    if start_line.search(entry) or end_line.search(entry):
-        return _fail("the drafted entry contains a sentinel line - refusing (it would corrupt the "
-                     "marker structure). Remove the WF: marker lines from the entry.")
+    # 5) Place the block through the fail-closed engine. `new_doc` now holds the entry's content,
+    #    so the entry file itself is no longer needed.
+    try:
+        new_doc = _place_block(doc, block_key, scope, anchor_slug, placement, entry)
+    except _PublishError as exc:
+        return _fail(str(exc) + " Nothing published.")
 
-    starts = start_line.findall(doc)
-    ends = end_line.findall(doc)
+    # 6) Consume the drafted entry BEFORE writing, and fail closed if it cannot be removed. A
+    #    successful publish must NEVER leave a reusable entry: a surviving entry would be silently
+    #    re-published under the NEXT publish's scope - which, for a different `--section`, emits the
+    #    wrong content (convergence round-2 BLOCKING #1; the earlier "idempotent" reasoning held only
+    #    for the SAME scope). Consuming first also makes every publish require a freshly-drafted entry.
+    try:
+        ENTRY.unlink()
+    except OSError as exc:
+        return _fail("cannot consume the drafted entry ({}) - refusing to publish, because a surviving "
+                     "entry could be silently re-used for another scope. Close whatever holds {} and "
+                     "retry.".format(exc, ENTRY))
 
-    # 3) Fail-closed on ANY malformed sentinel state - never guess into a real doc.
-    if len(starts) != len(ends):
-        return _fail("malformed sentinels in {}: {} start marker(s) vs {} end marker(s). "
-                     "Refusing to write.".format(target, len(starts), len(ends)))
-    if len(starts) > 1:
-        return _fail("more than one WF:{} sentinel pair in {}. Refusing to write.".format(key, target))
-
-    block = "{}\n{}\n{}".format(start_full, entry, end_marker)
-
-    if len(starts) == 0:
-        # First write: prepend the block newest-first, just under the anchor heading,
-        # matching OVERVIEW's real prepend-log convention.
-        m_anchor = anchor_line.search(doc)
-        if not m_anchor:
-            return _fail("anchor '{}' not found as a heading in {}. Refusing to guess a "
-                         "location.".format(pub["anchor"], target))
-        insert_at = m_anchor.end()                 # end of the anchor heading's line (before its newline)
-        new_doc = doc[:insert_at] + "\n\n" + block + doc[insert_at:]
-        how = "first write (prepended under '{}')".format(pub["anchor"])
-    else:
-        # Re-settle (exactly one pair): replace the whole block in place, keeping its
-        # position. Guard against a reversed pair (both counts 1 but end before start)
-        # before splicing, so we never corrupt the doc.
-        m_start = start_line.search(doc)
-        m_end = end_line.search(doc)
-        if m_end.start() < m_start.start():
-            return _fail("end marker precedes start marker for WF:{} in {}. "
-                         "Refusing to write.".format(key, target))
-        new_doc = doc[:m_start.start()] + block + doc[m_end.end():]
-        how = "replaced in place"
-
-    _atomic_write_text(target, new_doc.replace("\n", doc_nl))   # restore the doc's newline style
-    print("published '{}' -> {} ({}).".format(step, target, how))
+    # 7) Write atomically; a locked/failed target yields a clean _fail, not a traceback. (The entry is
+    #    already consumed, so a failed write means redraft-and-retry - the safe, fail-closed trade.)
+    try:
+        _atomic_write_text(target, new_doc.replace("\n", doc_nl))   # restore the doc's newline style
+    except OSError as exc:
+        return _fail("could not write {} ({}). Nothing published; redraft the entry to retry.".format(target, exc))
+    print("published '{}' -> {} (mode={}, scope={}).".format(step, target, mode, scope))
     return 0
 
 
@@ -606,7 +958,7 @@ def cmd_reset(args):
 
 
 def build_parser():
-    p = argparse.ArgumentParser(prog="workflow", description="Six-step workflow machinery (Need slice).")
+    p = argparse.ArgumentParser(prog="workflow", description="Six-step workflow machinery (all step rows + publish engine).")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     s = sub.add_parser("start", help="bootstrap a task (human-owned entry)")
@@ -625,8 +977,11 @@ def build_parser():
     s.add_argument("--force", action="store_true", help="advance without a fresh receipt (recorded)")
     s.set_defaults(func=cmd_advance)
 
-    s = sub.add_parser("publish", help="place the settled prose into its doc between sentinels")
+    s = sub.add_parser("publish", help="place the settled prose into its doc (log or section mode)")
     s.add_argument("step", choices=STEPS)
+    s.add_argument("--section", help="section-slug (required for a section-mode publish)")
+    s.add_argument("--new", action="store_true", help="section mode: require the section does NOT exist yet")
+    s.add_argument("--update", action="store_true", help="section mode: require the section already exists")
     s.set_defaults(func=cmd_publish)
 
     s = sub.add_parser("status", help="print the current task state")

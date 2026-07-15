@@ -141,3 +141,67 @@ that merely mentions the marker syntax can't be miscounted into an overwrite.
 and a pure-CRLF file stays pure-CRLF — proven on the real interpreter, both directions.
 **Pointers:** `claude/workflow/workflow.py` (`_atomic_write_text`, `cmd_publish`),
 `tests/workflow/test_publish.py` (LF+CRLF checks) (2026-07).
+
+## Seed an existing hand-written doc as a machine-writable target
+**When you need this:** a tool will start writing settled content into a doc humans have maintained by
+hand (a status log, a decision log, an architecture section), and it must place content deterministically
+— without a fragile heading match, without duplicating what's already there, and without ever corrupting
+the human prose around it.
+**The path:**
+1) **Anchor on a SEEDED comment, not a heading.** Drop one HTML-comment sentinel where new content should
+   land — `<!-- WF:anchor:<slug> -->` — under the relevant heading. Comments are invisible when rendered,
+   never collide, and don't drift the way heading *text* does (a doc may have no stable heading at all).
+2) **Match whole lines at column 0** (exactly what the tool writes), and carry identity on BOTH ends of a
+   managed block (`<!-- WF:<key>:<scope>:start -->` … `:end`), so one block can never be mistaken for
+   another's and a second writer *accumulates* instead of clobbering.
+3) **Adopt existing content by wrapping it ONCE.** For a doc whose current body should become
+   machine-managed (so a later "create if absent" won't duplicate it), wrap that body by hand in a
+   start/end block with a stable slug — the tool then recognizes it and *replaces in place* on the next
+   write instead of appending a copy.
+4) **Fail closed on anything ambiguous:** exactly one anchor or refuse; a marker inside a code fence
+   (```` ``` ````, `~~~`, or indented) → refuse (you can't safely place around a quoted example); a
+   malformed/duplicate block → refuse. Never guess into a committed doc.
+5) **Seed once, by hand, and VERIFY read-only before trusting it:** run the placement function in memory
+   against the real doc's bytes and assert it lands correctly AND leaves every existing byte untouched —
+   keep the placement logic a pure function so this proof writes nothing.
+**Gotchas:** don't reuse heading text as the anchor (it collides and drifts); if the doc doubles as a
+milestone record, *mark* superseded sections rather than deleting them; pin `*.md eol=lf` in
+`.gitattributes` so a publish never flips the whole file's newlines.
+**How you know it worked:** a simulated write inserts/replaces exactly one block under the anchor and a
+byte-for-byte comparison shows every other byte unchanged; a doc missing the anchor, or carrying a fenced
+marker, is refused rather than mis-edited.
+**Pointers:** `claude/workflow/workflow.py` (`_place_block`, `_wf_marker_in_fence`, `cmd_publish`),
+`docs/ARCHITECTURE.md` ("M4 — the publish engine"), `DECISIONS.md` 2026-07-14 (M4) (2026-07).
+
+## Prove a model-dependent system with a live smoke-test (not just a green suite)
+**When you need this:** your system's value depends on a *model* really doing something — spawning a
+reviewer, reading a bundle, following an instruction — and your test suite fakes that part with a script.
+A green suite then means "the code paths I thought of work", which is not the same claim. Twice now (M2,
+M4) a passing suite hid a real defect that one live run surfaced immediately.
+**Why it works:** a scripted actor does only what it is told, so it exercises the paths you already
+imagined. A live one reads its whole environment — files you forgot were there, instructions you assumed
+were clear — so it finds the paths you did not. That difference is structural, not a matter of test
+quality: at M4 the suite had 121 green checks and still could not have reached either finding.
+**The path:**
+1) **State the bar before you run** — what must be true for this to count (T2). Write it down first; a
+   live run produces a lot of interesting noise, and a bar set afterwards bends to fit it.
+2) **Isolate, but keep it real.** Run in a throwaway sandbox that holds *copies* of the real artifacts,
+   so placement/parsing hits real anchors and real size while the real files stay untouchable.
+3) **Hand the actor the entry point and NOTHING else.** No pasted secrets, no restated instructions. If
+   the design's claim is "the rules ride inside the bundle", then restating them in the prompt tests your
+   prompt, not the design. A handed-over secret proves nothing about whether it was read.
+4) **Use a fresh actor per round** if independence is part of the design, and check what the previous
+   round left on disk — that is exactly where M4's contamination bug lived.
+5) **Watch what it does that you did not ask for.** The findings come from the actor's *incidental*
+   behaviour: what it read on the way, what it inferred, what it reported back as fact.
+6) **Verify every fix with a CONTROL.** Run the *pre-fix* code over the same sequence and watch the bug
+   reproduce. Without that, a green check may just mean the setup no longer triggers the bug.
+**Gotchas:** the false green is the trap — M4's first fix-check passed because an unrelated `reset` had
+already removed the file under test, so nothing was proven. Budget for it: a live run is slow (minutes per
+actor) and cannot be replayed, so its evidence is inherently a witnessed event, not a re-runnable artifact
+— which is why the *findings* must be converted into permanent tests and recorded risks the same turn.
+**How you know it worked:** every bar item is met by an observation, not an inference; each new finding is
+either fixed-and-locked by a test that fails on the pre-fix code, or recorded as a named residual with its
+severity and owner. A live run that finds nothing is a result too — but only if it was free to.
+**Pointers:** `DECISIONS.md` 2026-07-15 (M4 Step 5) and 2026-07-13 (M2's live half); `RISKS.md` #15;
+`tests/workflow/test_workflow.py` (checks S/S2/S3 — the fix L2 earned) (2026-07).
