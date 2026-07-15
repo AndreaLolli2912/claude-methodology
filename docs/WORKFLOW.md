@@ -6,14 +6,17 @@
 > **Maintenance:** this is a design spec, **not yet built** — the source of truth for that build.
 > Update it whenever a decision here changes, and log the change in `DECISIONS.md` (P1).
 >
-> **Status (2026-07-14):** theory complete and agreed. **M1 (validate by hand) passed**; **M2
+> **Status (2026-07-15):** theory complete and agreed. **M1 (validate by hand) passed**; **M2
 > (technical design + de-risk) passed** — the machinery is designed (see `ARCHITECTURE` "Workflow
 > machinery"), de-risked by a throwaway spike, and **live-smoke-tested** (all three hooks/status-line
 > fire in a real session; the test caught and fixed a nudge that was silently inert). **M3 (walking
-> skeleton): the Need-slice machinery is built and proven end to end — Steps 1-4 done** (2026-07-14).
-> Step 4 (Implementation) built the production Need-slice code, red-teamed it with the Step-4 team of
-> attackers over two clean rounds, and proved all four proof items on a 3-round toy-Need dogfood (see
-> OVERVIEW + DECISIONS, and the **Build plan** M3 line). M4 next. Lessons folded into the challenger rules below:
+> skeleton): passed** — the Need-slice machinery built and proven end to end on a 3-round toy-Need
+> dogfood, red-teamed over two clean rounds. **M4 (complete the step set): PASSED as sliced
+> (2026-07-15)** — all four remaining review rows + the generalized publish engine, 124 checks, eleven
+> blocking defects fixed, and a live real-challenger smoke-test that caught two more (see the **Build
+> plan** M4 line for what was deliberately deferred out of it). **The six-step machinery now exists and
+> works — but nothing runs it automatically and nothing is deployed: that is M5 + M6.** Lessons folded
+> into the challenger rules below:
 > operator context (rule 6) and effort triage (rule 7) from M1; and from **dogfooding M2** —
 > attack-anything / defend-from-the-record plus the reopening cap (rule 3), full ranked findings with
 > severity tags (rule 5), and the cold-then-warm two-pass read (rule 6).
@@ -307,12 +310,24 @@ system is built by its own rules. **Each item is a fresh conversation that reads
   the Need-slice code (`workflow.py` + `rulebook.md`, `challenger.md`, `conductor.md`), red-teamed it with
   the team of attackers over two clean rounds, and **proved all four proof items** on a 3-round toy-Need
   dogfood in the isolated test project (44-check suite; live `~/.claude` untouched). Next: **M4**.
-- **M4 — Complete the step set.** The other five attacker subagents sharing the rulebook; wire the
-  built-in tools into Step 4; add the research-helper; **design region-anchoring** for shared docs (the first shared-writer step
-  needs it — moved here from M3, see DECISIONS 2026-07-14); auto-docs for every step;
-  **revisit forcing the cold read** (deferred α-2 from M3 Step 2) as the warm set grows across the
-  added steps — see DECISIONS 2026-07-14.
-- **M5 — Control layer.** Status line shows the current step; one soft-flag hook for step-skips.
+- **M4 — Complete the step set. ✓ PASSED AS SLICED (2026-07-15).** *Delivered:* the four remaining
+  review-style rows (`design`/`architecture`/`judgment`/`shipping`) as data, sharing one rulebook and a
+  structurally-frozen challenge contract; **region-anchoring designed and built** (seeded per-location
+  `WF:anchor:<slug>` comments); auto-docs for every publishing step via one `_place_block` engine
+  covering both real shapes (log-accumulate + sectioned replace-or-create). Proven by **124 checks** and
+  a **live real-challenger smoke-test** (4 real subagents, one per new row). Eleven blocking defects
+  found and fixed by the red-team; the live run found two more the green suite structurally could not.
+  *(DECISIONS 2026-07-15 ×2; ARCHITECTURE "M4 — the publish engine"; RISKS #15/#16/#17.)*
+  **Deliberately deferred OUT of M4 (still open, not yet re-homed to a milestone):** (a) wiring the
+  built-in tools into Step 4's attacker team, (b) the research-helper, (c) **forcing the cold read**
+  (α-2). Deferral criterion was **mechanism, not effort** — the Implementation team is a genuinely
+  different attack mechanism with an open feasibility question, whereas the four review rows shared the
+  prose-challenger mechanism and were cheap. **Decide where (a)-(c) live before M5 closes.**
+- **M5 — Control layer.** Status line shows the current step; one soft-flag hook for step-skips. This is
+  what makes the machinery *fire on its own* — today every verb is typed by hand or by the model reading
+  `conductor.md`. Inherits **RISKS #15** (later steps challenge a record lacking earlier corrections),
+  **#17** (raw tracebacks get ugly under hooks), and **#11** (a compare-and-swap tripwire once a hook can
+  auto-fire `publish`).
 - **M6 — Transport & packaging.** Grow `sync.py` to deploy whole `skills/ agents/ hooks/` directories
   (retiring the per-file manifest); update the `CLAUDE.md` core and `METHODOLOGY.md`; bump the
   version + `CHANGELOG`. Plain `~/.claude` bundle by default (personal use), not a plugin, unless we
