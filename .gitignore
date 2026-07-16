@@ -7,3 +7,6 @@
 
 # Python bytecode cache (e.g. from running or compiling sync.py)
 __pycache__/
+# Live workflow-task sandbox (drafts + marker). Ephemeral per task, never shipped;
+# kept out of %TEMP% so a temp sweep cannot destroy an in-progress step.
+/.wf-sandbox/

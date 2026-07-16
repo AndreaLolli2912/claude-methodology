@@ -19,9 +19,11 @@
 | 12 | **Sentinel matching was code-fence-blind and key-specific.** A column-0 sentinel inside a fence could match; the entry-guard only rejected the current step's key. | Low | **Resolved at M4** — key-agnostic entry guard + fail-closed fence guard (```/`~~~`/indented fences); safe *placement* around fenced markers still deferred |
 | 13 | **`publish` certifies the challenged DRAFT, not the ENTRY it writes.** The gate hashes `draft-<step>.md`; the published text comes from `publish-entry.md`, which is not tied to the receipt. | Low | **Mitigated at M4** — `record` clears any leftover entry (no stale prior-round entry can publish); a fresh-but-divergent entry is model-authored + human-reviewed (inherent residual) |
 | 14 | **`--update` to a wrong-but-existing section slug replaces the wrong section.** A typo'd `--section` that matches a *different* real section passes the `existing == 1` count check. | Low | Accepted (human-diff-gated) — the operator reviews the diff before commit; no slug registry |
-| 15 | **Later steps challenge a record that lacks every earlier correction.** `prior_settled` feeds challengers the *drafts*; challenge-forced corrections live only in the *entry*, and folding them back into a draft flips its receipt stale. | Medium | **Documented at M4** (found by the live smoke-test, empirically verified); the resolution is a design choice — deferred to M5 |
+| 15 | **Later steps challenge a record that lacks every earlier correction.** `prior_settled` feeds challengers the *drafts*; challenge-forced corrections live only in the *entry*, and folding them back into a draft flips its receipt stale. | Medium | **Documented at M4**, **reproduced live at M5** (the gate held — see detail). Out of M5's scope; **re-homed to M7** (2026-07-15), whose theme is exactly this: the fidelity of what a challenger is shown |
 | 16 | **The machinery cannot run against this repo's own docs in place** (self-hosting gap). `ROOT` is the script's folder, so a `publish` from `claude/workflow/` targets `claude/workflow/docs/`, not `docs/`. Every live proof ran in an external sandbox on *copies*. | Low | Documented at M4 (found by the Shipping challenger) — coverage is equivalent (see detail); a real in-place run needs M6 deployment |
 | 17 | **Two writes surface a raw traceback instead of a clean refusal** — `cmd_prepare`'s bundle write and `_save_marker` (all verbs) are unguarded on `OSError`. | Low | Accepted at M4 — fails **loud**, not silent, so the honest floor holds; ugly under M5's hooks, revisit there |
+| 18 | **The canary proves the bundle was *read*, not that it was *fresh*.** `prepare` bundles whatever bytes its sources happen to hold; nothing checks them against the real files, so a stale warm source reaches the challenger under a green canary. | Medium | **Found at M5** (live, inside the Need step's own harness) — the copy-drift instance closes with M5's rooting fix; the general property does not. **Re-homed to M7** |
+| 19 | **`sync.py install` hot-swaps the live machinery under a running task.** Once M5 deploys one global copy (D-1), the machinery that *runs* a task is the last installed snapshot of the machinery being *edited* — and freshness is hash-based, so a `receipt_state` or `artifact_path` change landing between `prepare` and `record` silently changes what a green receipt means. | Medium | **Found at M5 Design** (2026-07-15), reasoned not yet observed. **Structural, not occasional** — M6/M7 edit `workflow.py` and run through this workflow in this repo, so "install while a marker is live" is the development loop. No mitigation by construction; `sync.py status` is a readout he must remember, and the habit that causes it (`edit, then install`) is the recorded one |
 
 ## Detail
 
@@ -139,6 +141,19 @@ settled Design/Architecture decision — so it is recorded here and carried to *
 Implementation step. Mitigating factor: the human reads every entry at settle and the drafts are preserved, so
 the divergence is visible in the working tree rather than hidden.
 
+**Update (M5 Need, 2026-07-15) — reproduced live, and the gate held.** M5's own Need step walked into this from
+the *other* side and confirmed the mechanism costs exactly what #15 predicts. Corrections forced by rounds 7 and
+8 were folded back into `draft-need.md` — the honest path — which flipped the receipt `fresh → stale`, so
+`publish` refused, so the draft had to be re-challenged. **Rounds 8 and 9 existed because the machinery demanded
+them, not because anyone chose to run them.** That is the design working: the honest path is enforced, not
+merely encouraged. The finding is the **cost asymmetry** it makes concrete — the honest path costs a full extra
+round; the cheap path (fix only the entry) costs nothing and leaves no trace. That asymmetry **predates M5** (the
+gate already refused a stale publish before any hook existed), so M5 does not create it — but M5's nudge does
+tilt it slightly the **wrong** way: the nudge makes the honest path's owed round arrive *sooner and louder*,
+while the cheap path stays exactly as invisible as it is today. A narrow tilt, and an argument for re-homing #15
+to its own milestone **soon** rather than never. **M5 explicitly scopes #15 out**: it is about the *challenge
+record*, not the *control layer*, and it landed on M5 by date rather than by subject.
+
 **#14 — `--update` to a wrong-but-existing slug (human-diff-gated).** Section publishes require `--section
 <slug>` plus explicit `--new`/`--update`, and the count guard fails closed on a mismatch (`--new` needs 0
 existing, `--update` needs exactly 1). The one residual: a *typo* whose slug happens to match a *different*
@@ -166,3 +181,40 @@ instead of a clean one-line refusal. Accepted for M4 on the principle that decid
 **loud**, never silently green — no receipt is written, no doc is touched, so the honest floor is intact and the
 failure is impossible to mistake for success. It is a polish issue, not a correctness one. Revisit at **M5**,
 where a hook swallowing or mangling a traceback would make it genuinely confusing.
+
+**#19 — `install` hot-swaps the machinery under a live task (found at M5 Design, 2026-07-15).** Before M5 this
+was unreachable: the machinery could not run against a project in place, so there was no "live task" for an
+install to land in the middle of. D-1 (one global copy in `~/.claude`, pointed at whichever project it serves)
+makes it reachable, and the operator's recorded habit is what triggers it — *"I edit in the repo, then run
+`python sync.py install`"* (`OPERATOR.md`). Two consequences: (1) `install` between `prepare` and `record`
+swaps `workflow.py` while a receipt is pending, and freshness is **hash-based**, so a change to
+`receipt_state` or `artifact_path` silently changes what a green receipt *means*; (2) the running machinery is
+the last *installed* snapshot of the machinery being *edited*, and nothing in the status line, the nudge, or
+the hooks reports drift between `claude/workflow/workflow.py` and `~/.claude/workflow/workflow.py`. **This is
+structural, not occasional** — M6 and M7 both edit `workflow.py` and run through this workflow in this repo, so
+"install while a marker is live" *is* the development loop. Related to but distinct from #16: that one says the
+machinery cannot self-host; this one says self-hosting brings its own hazard. *Deliberately recorded without a
+mitigation.* `sync.py status` (`sync.py:404`) reports repo-vs-live drift, but it is a **read-only readout he
+must remember to run**, and RISKS #3 still calls it "planned" — so it mitigates by habit, not by construction,
+and the habit that causes the swap is the one he actually has. M5's D-11 candidates (print `sync.py status` at
+`enable-workflow` time; refuse `start` when live differs from the repo) cover the *edges*, never an `install`
+run *during* a task. Revisit when M5's install lands and the loop is real.
+
+**#18 — the canary proves the bundle was READ, not FRESH (found at M5).** The honest floor rests on the canary:
+`prepare` plants a secret token in the challenge bundle and `record` refuses the challenge unless the challenger
+echoes it back. That is a real guarantee, and it is **narrower than it looks** — it proves the challenger *read
+the bundle it was handed*. It says nothing about whether that bundle reflected the current state of its sources,
+because `prepare` bundles whatever bytes its warm sources happen to hold and never compares them against
+anything. **Found live, inside M5's own Need step:** the sandbox's copy of `OPERATOR.md` was frozen at round 2,
+so **every warm pass from round 3 to round 8 ran on stale operator context** — under a green canary, with nothing
+anywhere reporting it. Confirmed by `diff` against the real file, and only noticed because a challenger flagged
+that `OPERATOR.md` was silent on the exact habit the milestone turns on — the file had in fact been updated,
+several rounds earlier, in a copy the harness never saw. This is a miniature of #15 (a record diverging from
+what the challenger is shown) living one level down, inside the harness. **Two halves, and only one closes:**
+the *copy-drift* half is an artifact of the sandbox shape (#16 — warm sources are copies because the script can
+only see its own folder), and M5's rooting fix closes it by letting `prepare` read the real files in place. The
+*general* half does not close — a source edited after `prepare` but before the challenge runs is still stale in
+the bundle, and the canary will still be green. *Fix when it matters:* hash the warm sources into the receipt
+alongside the artifact, so a bundle assembled from stale bytes reads `stale` the same way a corrected draft does.
+Recorded rather than fixed at M5: it is not in the control layer's scope, and it belongs with #15's re-homing —
+both are about the fidelity of what a challenger is shown.

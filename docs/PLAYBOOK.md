@@ -109,10 +109,29 @@ happily pass through several wrong fixes in a row.
    only the hook can act; or run a **self-evidencing** test where the *difference* between two cases
    isolates it (e.g. with writes auto-allowed, a doc write stays silent while a code write prompts —
    only the hook explains the gap).
+5) **Fire every candidate channel in ONE invocation, each tagged with a unique marker.** When several
+   fields might carry your message (a reason, a warning, a context injection), do not probe them one at a
+   time — emit them all together, each carrying an unmistakable tag (`[CH-REASON]`, `[CH-SYSMSG]`, …), and
+   ask *which tags appeared, and when*. One real run then maps every channel at once, and the tags make the
+   answer unambiguous where "did you see a warning?" would not. M5 mapped six channel/event pairs in four
+   runs this way, and the map — not the code — turned out to be the milestone's real product.
+6) **Do not trust "universal" in the docs, and never generalise a field across events.** Claude Code lists
+   `systemMessage` as a common output field. It is universal in *processing* — it fires and is recorded on
+   every event — and **not** in *rendering*: it draws on `UserPromptSubmit` and draws nothing on
+   `PreToolUse`. A probe emitting *only* that field settled it in one run. The same page shows the pattern
+   is real (`sessionTitle` is "ignored on `clear` and `compact`"), so per-event behaviour is the default
+   assumption, not the exception.
+7) **Read the whole table, not the row you came for** — and re-read your own test output. M5 quoted
+   `systemMessage` out of the universal-fields table three times while missing `continue: false` **two rows
+   above it**, which outranks every field it did name. Separately, a git test's output showed an unwanted
+   file being staged; the write-up reported the three results that supported the conclusion and read past
+   the fourth. Running the experiment is half the discipline; reading all of it is the other half.
 **How you know it worked:** the test would fail if the output format were wrong, and a live run shows
 the host actually invoking and honoring it — with the hook isolated so nothing else could have caused
 the effect.
-**Pointers:** `docs/DECISIONS.md` 2026-07-14 (M2 live smoke-test + nudge-hook bug) (2026-07).
+**Pointers:** `docs/DECISIONS.md` 2026-07-14 (M2 live smoke-test + nudge-hook bug); `docs/DECISIONS.md`
+2026-07-15 (M5 Design — the channel map, and the blacklist→whitelist inversion after three missed block
+routes) (2026-07).
 
 ## Edit part of a text file without a surprise whole-file diff (and don't get version-pinned)
 **When you need this:** a tool edits *part* of a committed text file (insert a block, replace a region) and

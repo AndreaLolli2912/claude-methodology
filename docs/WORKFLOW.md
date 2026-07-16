@@ -15,7 +15,10 @@
 > (2026-07-15)** — all four remaining review rows + the generalized publish engine, 124 checks, eleven
 > blocking defects fixed, and a live real-challenger smoke-test that caught two more (see the **Build
 > plan** M4 line for what was deliberately deferred out of it). **The six-step machinery now exists and
-> works — but nothing runs it automatically and nothing is deployed: that is M5 + M6.** Lessons folded
+> works — but nothing runs it automatically and nothing is deployed: that is M5 + M6.** **M5 (control
+> layer) is open: Step 1 (Need) settled 2026-07-15** — the three ambient pieces *plus* the rooting fix
+> that turns out to be the real blocker, and ending in a live install rather than a sandbox proof.
+> **Step 2 (Design) next.** Lessons folded
 > into the challenger rules below:
 > operator context (rule 6) and effort triage (rule 7) from M1; and from **dogfooding M2** —
 > attack-anything / defend-from-the-record plus the reopening cap (rule 3), full ranked findings with
@@ -81,7 +84,19 @@ start? — as distinct from the small *micro*-judgement the human makes at every
 - **The challenger is a separate AI (a subagent).** Independence is *the mechanism* that lets it
   catch what the builder can't see: less shared context means fewer shared blind spots.
 - **The human makes the calls.** The AIs propose and attack; the human decides and settles.
-- **Automatic, never typed `/` commands.** Things fire on their own — by context or by event.
+- **The *flow* is automatic — it is never driven by typed `/` commands.** Things fire on their own, by context
+  or by event, because relying on someone to remember is the failure this whole design exists to remove.
+  *(Narrowed 2026-07-15, M5. This read "Automatic, never typed `/` commands" — an absolute the system already
+  contradicted: `start` **is** a typed command, the deliberate human-owned bootstrap M2 settled on purpose, and
+  the M2 record itself carried the narrow wording "drive the flow with typed `/` commands". The rationale
+  defends banning `/` for driving the flow; it says nothing about the **bootstrap**.)* **Open, with a test —
+  not a maybe:** whether the bootstrap should become a `/start-task` command. It would be strictly friendlier
+  than typing `python claude/workflow/workflow.py start "…"`, and it violates nothing the rationale protects.
+  **The operator's criterion is usefulness** — *"we might accept `/` commands if we find them useful"*, *"if it
+  solves ambiguity or makes the tool better"* (2026-07-15). That criterion is **empirical, so this is not
+  decidable now**: nobody has typed the long form on real work yet, because nothing is deployed. **Decision
+  point: M5's Judgment step** — the first moment real-use evidence exists, since M5 ends installed and used
+  (M5 proof item 10). **Not decided.**
 - **Docs writing themselves is a hard requirement**, not a nice-to-have.
 - **The observer is the human.** (A neutral observer *AI* was considered and set aside — the human
   already fills that seat.)
@@ -323,15 +338,82 @@ system is built by its own rules. **Each item is a fresh conversation that reads
   (α-2). Deferral criterion was **mechanism, not effort** — the Implementation team is a genuinely
   different attack mechanism with an open feasibility question, whereas the four review rows shared the
   prose-challenger mechanism and were cheap. **Decide where (a)-(c) live before M5 closes.**
-- **M5 — Control layer.** Status line shows the current step; one soft-flag hook for step-skips. This is
-  what makes the machinery *fire on its own* — today every verb is typed by hand or by the model reading
-  `conductor.md`. Inherits **RISKS #15** (later steps challenge a record lacking earlier corrections),
-  **#17** (raw tracebacks get ugly under hooks), and **#11** (a compare-and-swap tripwire once a hook can
-  auto-fire `publish`).
+- **M5 — Control layer. Step 1 (Need) settled 2026-07-15** (clean on the ninth round; DECISIONS + OVERVIEW
+  2026-07-15). What makes the machinery *fire on its own* — today every verb is typed by hand or by the model
+  reading `conductor.md`. **Three ambient pieces:** a status line showing the current step *and* its honest
+  `fresh`/`stale`/`missing` receipt state; a `UserPromptSubmit` nudge telling the **model** a challenge is owed
+  (once, not every turn); a `PreToolUse` warner on code written before Implementation. **Plus the rooting fix,
+  which is the milestone rather than a detail in it:** line 40's `ROOT = Path(__file__).resolve().parent` hangs
+  every path off the script's own folder, so a global status line would print "no task open" in every project
+  forever. That defect is **invisible in the sandbox** — M3 and M4 ran where script, docs and state shared a
+  folder, the one shape in which `__file__`-rooting works — which is why it surfaces only now (RISKS #16, second
+  place). Also in scope: `sync.py` wiring, a live smoke-test, and **the install** (the operator has ruled that
+  "built but never deployed" is not an acceptable end state). **Human ruling:** per-event latency at the ~100 ms
+  scale is **not** a design constraint — inertness stays non-negotiable as a *behaviour*, its ~140 ms cost is
+  accepted (`OPERATOR.md`). **Inherits #17** (raw tracebacks get ugly under hooks) and **#11** (a
+  compare-and-swap tripwire once a hook can auto-fire `publish`). **#15 is scoped OUT** — it is about the
+  challenge record, not the control layer, and landed here by date rather than subject; it needs its own
+  milestone, and M5's nudge tilts its cost asymmetry slightly the wrong way (RISKS #15 detail). **New: #18** —
+  the canary proves a bundle was *read*, not *fresh*.
+  **Step 2 (Design) settled 2026-07-15** — clean on the **eleventh** round (DECISIONS 2026-07-15). **M5 now
+  ships TWO ambient pieces, not three:** the skip-warner is **dropped** on four measured grounds and re-homed
+  to M7. Design's open empirical question got a measured answer, and it was not the expected one — *no*
+  channel puts the reason on screen at the moment of decision (`systemMessage`, the Need's favourite, fires on
+  `PreToolUse` and renders nothing; `permissionDecisionReason` reaches Claude, never the human; even
+  `PermissionRequest`, which fires exactly *"when a permission dialog appears"*, carries no human-facing field).
+  §5.3's honest-fail clause was invoked by human ruling. Settled: `BUNDLE` vs `PROJECT` (one name was doing two
+  jobs); the CLI walks up (`.git` for `start`) and every verb prints its root; a separate `statusline_wf.py`
+  the setting points at; the nudge quiet only on `UserPromptSubmit` with `SessionStart(…|compact)` always
+  re-injecting; all task state in a self-ignoring `.workflow/`. **The hook's output contract is a whitelist,
+  not a blacklist** — three rounds running, an enumeration of block routes missed a live one (`"ask"`, then
+  `decision: "block"`, then universal `continue: false`), so the hook now emits two known-safe keys and any
+  other key is a bug.
+  **Step 3 (Architecture) settled 2026-07-16** — clean on the **sixth** round (blocking 2→3→1→1→1→0;
+  ARCHITECTURE `WF:arch:control-layer`, DECISIONS 2026-07-16). **Both owed probes were run first and both
+  answered:** `SessionStart` **fires and delivers** on the `compact` matcher (D-7 stands on measured
+  ground; alternation works on this non-tool event), and project hooks **merge** with user hooks across
+  every scope (D-1 cannot be silently disabled) — `CLAUDE_CONFIG_DIR` is real-but-undocumented, which let
+  the user boundary be tested without touching live `~/.claude`. The rounds turned real seams: a
+  cross-directory import that would blank the status line (renderer belongs in `claude/`, not
+  `claude/workflow/`); a round-1 fix that removed a stat-before-import guard (caught round 2); D-8's
+  unhomed `enable_statusline` change (a new-box re-run would wipe the `wf:` segment); the test suite's
+  **subprocess** CLI calls that, un-aimed after the rooting change, would `reset` the repo's own live
+  marker (fixed by `cwd=TMP`); and a broken-branch fail-loud that discarded its own warning (fixed by a
+  stdlib-only terminal broken branch). **Human rulings:** the resolved root prints to **STDERR**; the
+  **six Need corrections are applied now**, ahead of Implementation. **Owed, now in progress:** the six
+  corrections (apply-now). *(Opportunistic-only, design leans on neither: auto- vs manual-compaction;
+  `systemMessage` on SessionStart.)*
+  **The three M4 debts are homed (M5 proof item 11):** built-in reviewers → **M7**; forcing the cold read
+  (α-2) → **M7** (it bit live — every challenger this step held the two passes apart by discipline, not by
+  the harness); the research-helper → **dropped**, because every probe this milestone ran on tools the main
+  agent already has and nothing was blocked. A closing condition nothing tests
+  is a wish.
 - **M6 — Transport & packaging.** Grow `sync.py` to deploy whole `skills/ agents/ hooks/` directories
   (retiring the per-file manifest); update the `CLAUDE.md` core and `METHODOLOGY.md`; bump the
   version + `CHANGELOG`. Plain `~/.claude` bundle by default (personal use), not a plugin, unless we
-  later choose to share it.
+  later choose to share it. *(M5's D-8 does **not** need this: it ships six named files, which the per-file
+  MANIFEST expresses fine — verified. RISKS #8 stays M6's.)*
+- **M7 — The challenge harness's own honesty.** Created 2026-07-15 by M5's Design, which owed the M4 debts a
+  named home (§8.11: "a closing condition nothing tests is a wish"). Everything here is about **the fidelity
+  of what a challenger is shown or attacked with** — one theme, unlike M5, which inherited these by date:
+  - **Forcing the cold read (α-2)** — deferred out of M3, then M4, and now measured biting: `prepare` writes
+    rulebook + COLD + canary + WARM into one file, and **the canary sits near the end of COLD**, so any read
+    that reaches it also delivers WARM. Every challenger across M5's eleven rounds reported holding the two
+    passes apart *by discipline, not by the harness*. `cmd_prepare`'s own docstring concedes it *surfaces*
+    rather than *forces* a cold read. The fix reopens the bundle format (two files, or a canary that lands
+    before COLD ends). `workflow.py:387` still says "deferred to M4", a shipped milestone.
+  - **RISKS #15** — later steps challenge a record lacking every earlier correction. Re-homed here from M5,
+    where it sat by date rather than subject. Same theme: what the challenger is shown.
+  - **RISKS #18** — the canary proves a bundle was *read*, not *fresh*. Same theme again; M5's rooting fix
+    closes its copy-drift half as a side effect and leaves the general half standing.
+  - **Built-in reviewers into Step 4's attacker team** — M4's deferral criterion was *mechanism, not effort*:
+    a genuinely different attack mechanism with an open feasibility question.
+  - **The skip-warner** (dropped from M5 by human ruling on measured evidence — DECISIONS 2026-07-15), with
+    M5's `"ask"` finding preserved: it **is** honored and **does** override a permission allow-list, proven by
+    control. A future design can spend that once it has a channel that can explain itself — which today's
+    platform does not offer on any of the three events that reach the moment of decision.
+  - *Dropped, not re-homed:* **the research-helper**. Every probe in M5 ran on tools the main agent already
+    has; nothing was blocked by its absence. Revisit only if a real task is.
 
 **Still open, to decide when we reach them:** plain `~/.claude` bundle vs. plugin (M6). *(Resolved
 since: one **adaptable** challenger file, not one per step — ARCHITECTURE; and skeleton the **Need**

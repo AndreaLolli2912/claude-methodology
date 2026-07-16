@@ -5,6 +5,209 @@
 
 <!-- WF:anchor:decisions-log -->
 
+### 2026-07-16 — Workflow machinery M5: Step 3 (Architecture) settled — the control layer, structured
+
+**Settled after six challenge rounds** (blocking 2 → 3 → 1 → 1 → 1 → **clean**), each with a fresh
+independent challenger. The full architecture is published to `ARCHITECTURE.md` under
+`WF:arch:control-layer`; this logs the decision and the human rulings.
+
+**Two probes the Design owed came back first, both answered by measurement** (throwaway project, live
+`~/.claude` untouched): `SessionStart` **fires and delivers** on the `compact` matcher (D-7 rests on
+this), and project hooks **merge** with user hooks across every scope (D-1's one-global-install cannot
+be silently disabled). `CLAUDE_CONFIG_DIR` is real-but-undocumented, which let the user boundary be
+tested safely.
+
+**What the rounds bought, concretely:** the status-line renderer would have died on a cross-directory
+import (wrong bundle folder); a round-1 "tidy-up" removed a stat-before-import safety guard and round 2
+caught the regression; D-8's mandated `enable_statusline` change had no home, so a new-box re-run would
+silently wipe the `wf:` segment; the test suite drives the CLI as a **subprocess** that, un-aimed after
+the rooting change, would `reset` the *repo's own* live marker and drafts (fixed by `cwd=TMP`); and the
+nudge's broken-branch fail-loud routed through the dead module's writer, silently discarding its own
+warning (fixed by making the broken branch stdlib-only and terminal).
+
+**Human rulings (2026-07-16):** the resolved root prints to **STDERR** (test-clean, still visible — it
+is the operator's own mis-root guard); and the **six corrections owed to the Need's draft are applied
+now**, ahead of Implementation, so the challenge bundle reads an accurate Need (RISKS #15).
+
+**Held the growth line** the Design broke: 272 → 442 lines across six rounds, all homing real missing
+structure, none re-arguing settled decisions. **Step 4 (Implementation) next**; sandbox dogfood; live
+`~/.claude` untouched; not committed.
+
+<!-- WF:design:796664b9:start -->
+### 2026-07-15 — Workflow machinery M5: Step 2 (Design) settled — the control layer, decided
+
+**Settled after eleven challenger rounds** (blocking: 4 → 3 → 1 → 2 → 1 → 2 → 0 → 1 → 1 → 1 → **clean**).
+The Need's eight open questions are answered, plus the four §5.7 items it handed Design. **M5 now ships two
+ambient pieces, not three** — the skip-warner does not survive its own evidence (below), which is the Need's
+own pre-authorized outcome rather than a scope cut of convenience.
+
+**The milestone's real product is a measured map of what the platform actually does**, built in a throwaway
+project with real dialogs, each hook logging its own firing so "never ran" is always distinguishable from
+"ran and was ignored". Everything that reaches a human **in time** lives on `UserPromptSubmit`; everything
+on `PreToolUse` is silent or too late. Specifically: `systemMessage` **renders on `UserPromptSubmit` and
+not on `PreToolUse`** — it is universal in *processing*, not in *rendering*, which no documentation says;
+`permissionDecisionReason` never reaches the human at all (it reaches *Claude*, as the tool-error body — so
+M2's generic dialog was the platform, not M2's bug); `additionalContext` reaches Claude **before it acts**
+on prompt-submit and only after the attempt on `PreToolUse`; and `permissionDecision: "ask"` **is** honored
+and overrides a permission allow-list (proven by control: hook removed → the write succeeded; hook emitting
+`"ask"` → it did not). `$CLAUDE_PROJECT_DIR` reaches a **status line** (undocumented) but **not the Bash
+tool** (measured absent) — and the env var and stdin disagree on slash direction, same directory, same
+invocation.
+
+**The decisions.** **D-1** one global install in `~/.claude` (copy drift is what `sync.py` exists to
+prevent; `statusLine` is a single value so a per-project line cannot coexist with his). **D-2** the Need's
+"line 40 is `__file__`-rooted" is only half the diagnosis — **one name was doing two jobs**: `BUNDLE`
+(script + rulebook, correctly `__file__`-relative) and `PROJECT` (`.workflow/` + docs, never). `PROJECT` is
+**handed in where the platform hands it, found where it does not**; one normalizer, because of the slash
+split. **D-2a** the CLI is handed nothing, so it walks up — for the marker on every verb, for `.git` on
+`start` — and **every verb prints the root it resolved**; `Path.cwd()` is rejected because the model types
+these verbs through a Bash tool **whose cwd persists between calls**, so no human `cd` is needed to poison
+it. **D-3** `root` is a parameter with a default, never a mutable global. **D-4** a separate
+`statusline_wf.py` the setting points at — *not* code inside `statusline.py`, because `statusline.py` is in
+MANIFEST and `settings.json` is not, and that asymmetry is exactly why `enable-*` is safe; under the
+alternative `disable-workflow` had no mechanism at all (`install` reverts a live edit; `capture` would
+promote "turn this off" into a commit on every machine). **D-5** one nudge script on two events, quiet rule
+scoped to `UserPromptSubmit`, `SessionStart(startup|resume|clear|compact)` always injecting — because a
+compaction destroys the model that was told while changing nothing a message-hash is computed from.
+**D-7** the conductor rides the nudge, extracted by the same sentinel mechanism `publish` already uses.
+**D-8** `sync.py` ships six named files; **`enable_hook` and `enable_statusline` are opposite idioms**
+(append-and-identity-match vs. bare assignment) and mirroring the wrong one onto `hooks.SessionStart` would
+silently delete `check_version.py`. **D-9** §5.7's ruling: Claude's blindness to a dead hook is **accepted**
+— the system is not blind, only the model is, and the honest floor never routes through hooks, so a dead
+hook loses a *warning*, never a *truth signal*. **D-10** all task state lives in a self-ignoring
+`.workflow/` (drafts move there from `docs/`), so `git add -A` is safe in every repo by construction rather
+than by a rule in this one.
+
+**D-6 — the skip-warner does not ship, on four measured grounds.** It cannot explain itself at the moment of
+decision (across a *complete* enumeration of the three events that reach that moment — including
+`PermissionRequest`, which fires *"when a permission dialog appears"* and carries no human-facing field at
+all; it appears nowhere in the Need's survey, because nobody looked). A generic pause is the failure mode
+§5.3 names, and the allow-list shows it is *this operator's*: 24 reflex approvals including a wildcard for
+arbitrary Python. It **cannot be proven to work** — `Write` prompts here with no hook installed, so the bar
+passes on a do-nothing implementation and §8.3's control prompts in both arms. And the evidence for its
+fallback came from an **unthrottled** nudge firing on the requesting prompt — the regime D-5 abolishes.
+What survives is the mechanism that demonstrably worked: with no hook able to block it, the nudge alone made
+the model decline the write and explain why. Re-homed to **M7** with the `"ask"` finding preserved.
+
+**The lesson worth keeping: a blacklist of forbidden routes is unmaintainable by construction.** Three times
+this Design enumerated "the ways a hook can block", and three times the list was short — `"ask"`, then
+`decision: "block"` (live on the exact event our hook registers), then **`continue: false`**, universal,
+outranking every field the list did name, sitting two rows above `systemMessage` in the very table the
+Design quotes for `systemMessage`. Each fix repaired the instance and the class walked one row over. The
+contract is now a **whitelist** — the hook emits `systemMessage` and `additionalContext` and nothing else,
+any other key is a bug — which is complete by construction, checkable in one assertion, and immune to
+routes the platform adds later.
+
+**What the rounds bought, concretely:** a gitignore carve-out that provably staged nothing (git will not
+re-include a file whose parent *directory* is excluded — the trailing-slash form fails **silently**); an
+`enable-statusline` rule that would have no-opped after its first run, defeating the command's whole
+recorded purpose on a machine whose Anaconda interpreter moves; the `check_version.py` deletion above; and
+`.wf-sandbox/` exposed as **live**, holding a rival marker for this very task — which `__file__`-rooting had
+made inert and D-2a's walk-up would have made *findable*.
+
+**Owed, recorded rather than discovered:** two probes before Implementation (what `SessionStart` delivers on
+`compact` — D-7 rests on it; and whether project hooks merge or replace, whose dangerous direction would
+silently disable the whole layer); **six corrections to the Need's own draft**, including must-not #1's
+mechanism, which names a route M5 can no longer reach. **Known false in the settled draft (round 11, minor):**
+D-10 justifies its carve-out partly on `reset` deleting `global-habits.md` — `cmd_reset` unlinks four named
+paths and never touches it. The decision stands on its other ground; the sentence does not.
+
+**Step 3 (Architecture) next.** Sandbox dogfood; live `~/.claude` untouched; not committed.
+<!-- WF:design:796664b9:end -->
+
+### 2026-07-15 — Workflow machinery M5: Step 1 (Need) settled — the control layer, scoped
+
+**Scope, human-sliced.** Build the three ambient pieces **and** solve the rooting problem properly, then
+**install it** — rather than prove them in a sandbox shape that hides the difficulty. The operator has stated
+this workflow will run on his machine and travel to his others through GitHub, so *"built but never deployed"*
+is not an acceptable end state. The Need itself is published in OVERVIEW (2026-07-15); this entry carries what
+the Need deliberately does not: the platform reading, the rulings, the risk movement, and the process failure
+that cost most of nine rounds.
+
+**The rooting problem is the milestone, not a detail inside it.** `workflow.py` line 40 —
+`ROOT = Path(__file__).resolve().parent` — hangs every path off the script's own folder. **Why it stayed
+invisible until now:** M3 and M4 ran in a single sandbox folder where script, docs and state sat together, so
+`__file__`-rooting was *accidentally* correct; the control layer is the first thing that cannot live in that
+shape, because a status line and a hook are handed a project and must serve it from somewhere else. RISKS #16
+recorded this at M4 as a self-hosting inconvenience — M5 finds it is the load-bearing blocker. Reproduced live
+twice: by import probe (standing in the real repo root, the marker resolved to `claude/workflow/.workflow/`),
+and again inside a real hook prototype that read the project path out of its payload correctly and then emitted
+nothing, because the import ignored it.
+
+**Three human rulings, recorded so nobody re-opens them by guessing.**
+1. **Latency at the ~100 ms scale is not a design constraint.** Put the real numbers to the operator — a
+   globally-installed hook costs **~140 ms per prompt and per file write in every repo**, including repos with
+   no task open — and the ruling was *"why should I fucking care about losing 0.1 seconds? I can work in as many
+   repositories as I like."* Now in `OPERATOR.md`. Inertness stays non-negotiable **as a behaviour** (no marker,
+   no sound); its *cost* is accepted. This removes the pressure that made "do project hooks merge with user
+   hooks?" look decisive, and points Design at the simple answer — one global install, which also keeps his
+   existing status line.
+2. **Precision is capped at ~10 ms.** *"If we have to argue about milliseconds let's just not be precise."* The
+   measurement noise was always wider than the digits being argued over.
+3. **Keep the skip-warner, and he must learn *why* before he answers.** Which channel carries the reason is
+   empirical, not ruled — Design probes it. An honest fail is an allowed outcome.
+
+**The document's own worst failure: an absolute nobody asked for.** An earlier draft demanded that inertness
+*"feel exactly like plain Claude Code — non-negotiable"*, discovered that unmeetable (a hook must start a
+process to learn there is no marker), and then defended it across rounds with **three separate wrong latency
+budgets** — one invented below the bare-interpreter floor, one inferred by arithmetic instead of measured, one
+subtracting rows with different baselines. All three existed to defend a requirement **the operator never
+stated**. Inventing an absolute nobody requested is how a Need manufactures its own crisis; the ruling struck it
+entirely.
+
+**Platform contracts are quoted, not summarised — because a summary was wrong twice, both times on exactly the
+load-bearing claim.** A research subagent reported that `additionalContext` is a top-level field and the
+`hookSpecificOutput` wrapper was "incorrect" (the wrapper **is** required — this is precisely the silently-inert
+nudge M2's smoke-test caught, so trusting it would have rebuilt the identical bug), and that project settings
+*replace* user hooks (**the docs never say** whether hooks merge or replace — and that fabricated certainty had
+already been used to eliminate a design option). So §2 of the Need splits every contract into **QUOTE** (the
+doc's words) / **GLOSS** (the inference that gets spent downstream) / **NOT SETTLED**. Three facts each decide a
+requirement:
+- **Exit 2 is not the only way to block.** `permissionDecision: "deny"` blocks the tool call and is delivered as
+  JSON **on exit 0**, one word from `"ask"` in the same enum. So "never hard-block" is **two** commitments, not
+  one: never exit 2 **and** never emit `deny`. Stating only the first would guard the invariant against the one
+  route we were never going to take while the reachable route sat unmentioned inside its own quote.
+- **A non-zero exit and JSON output are mutually exclusive** (*"JSON output is only processed on exit 0"*). One
+  invocation cannot both raise the human's transcript notice (needs non-zero) and tell Claude (needs JSON).
+- **`systemMessage`** — *"Warning message shown to the user"* — is a universal field emitted on exit 0 **beside**
+  `additionalContext`. One invocation, both audiences. It is what makes "never leave Claude thinking a broken
+  hook passed" reachable at all, and it is the most promising candidate for the skip-warner's reason.
+
+**Risk movement.** **New: #18** — the canary proves the challenge bundle was *read*, not that it was *fresh*;
+found live inside this very step's harness. **#15 reproduced live, and the gate held** — folding challenge-forced
+corrections into the draft (the honest path) flipped the receipt stale, `publish` refused, and rounds 8 and 9
+existed *because the machinery demanded them*, not by choice. The cheap path (fix only the entry) would have been
+silent. #15 stays **out of M5** and needs re-homing: it landed here by date, not subject. M5's honest effect on it
+is a narrow tilt the **wrong** way — the nudge makes the honest path's owed round arrive sooner, while the cheap
+path stays exactly as invisible as today.
+
+**The process failure, recorded because the record is the only place it gets caught next time.** The Need
+converged 7 → 8 → 5 → 4 → 5 → 3 → 1 → 3 → **0**. Nine rounds is the story, and the cause was the builder's, not
+the challenger's: **every round added text** — rationale for the fix, the history of the finding, a paragraph of
+self-criticism about the previous round — and that new text was never challenged, so it became the next round's
+attack surface. The builder was manufacturing findings and reading each one as proof the process worked. Cutting
+six rounds of narration dropped the draft ~15% and took findings from five to one. **A revision should usually be
+shorter than what it replaced;** history belongs in this log, at settle — not in the artifact under challenge.
+The challenger's own best finding names the second half: *"every fix has been applied exactly where the
+challenger pointed, and never to the class the challenger named"* — a rule about glosses added, then applied to
+**1 of 6** bullets while the header claimed it ran on all of them. **Fix the class, not the instance, and sweep
+by search rather than by memory.**
+
+**An open thread the operator raised, not closed here: the `/`-command ban is over-broad, and the record only
+half-defends it.** *"Eventually, we could bring the `/` command back if it solves ambiguity or makes the tool
+better."* He is right. The ground rule read *"Automatic, never typed `/` commands"* — but **`start` is already a
+typed command**, the deliberate human-owned bootstrap the M2 Need settled on purpose. The rationale ("things must
+fire on their own, because remembering is what fails") defends banning `/` for **driving the flow**; it says
+nothing about the **bootstrap**, and a `/start-task` command would be strictly better than typing `python
+claude/workflow/workflow.py start "…"` while violating nothing that rationale protects. The M2 record already
+carried the narrow wording (*"drive the flow with typed `/` commands"*, OVERVIEW 2026-07-13), so the ground rule
+was simply out of sync with what was decided. **Narrowed to what the record defends; the bootstrap question is
+not answered here.** His criterion is **usefulness** (*"we might accept `/` commands if we find them useful"*) —
+which is **empirical, and therefore not decidable yet**: nobody has typed the long form on real work, because
+nothing is deployed. So it gets a test and a home rather than a "maybe": **decided at M5's Judgment step**, the
+first point where real-use evidence exists (M5 ends installed and used). An open question with no test and no
+decision point is a wish — the same standard the Need applies to its own closing conditions.
+
 ### 2026-07-15 — Workflow machinery M4: Step 6 (Shipping) settled — M4 complete
 The last step. Ran **by hand** (M4's `shipping` row exists now, but M4's earlier steps left no `draft-*.md`
 files for `prior_settled` to bundle, so a machinery-assembled bundle would have been *thinner* than the real

@@ -333,3 +333,85 @@ environment: the stale-`challenge.md` contamination (**fixed**, above) and RISKS
 a record that lacks every earlier correction — **not** a code bug; deferred to M5).
 
 <!-- WF:arch:workflow-machinery:end -->
+
+<!-- WF:arch:control-layer:start -->
+## M5 — the control layer (Architecture settled 2026-07-16, six challenge rounds)
+
+The ambient layer that makes the six-step machinery *fire on its own*: a status line, a
+`UserPromptSubmit`/`SessionStart` nudge, and — the real milestone — the rooting fix that
+lets any of it serve a project it does not live inside. Two ambient pieces, not the
+Need's three (the skip-warner was dropped on measured evidence; re-homed to M7). Settled
+against measured platform behaviour, not assumption: both probes the Design owed came back
+answered (below), and the challenger ran six rounds (blocking 2→3→1→1→1→0).
+
+### The two probes the Design owed — measured, not assumed
+Ran in a throwaway project, touching nothing in live `~/.claude`. **Compaction:** a real
+`/compact` fires `SessionStart` with `source=compact` and its `additionalContext` reaches
+the post-compaction model — so the nudge surviving a compaction (D-7) rests on measured
+behaviour, and the alternation matcher `startup|resume|clear|compact` works on this
+non-tool event. **Merge vs replace:** project hooks *merge* with user hooks across every
+scope (user via `CLAUDE_CONFIG_DIR`, project, local, CLI-arg), even at identical
+event+matcher coordinates — so one global install cannot be silently disabled by a project
+with its own hooks. `CLAUDE_CONFIG_DIR` is real but undocumented (present in the binary),
+which is what let the user boundary be tested without touching the real config.
+
+### The rooting split — one name was doing two jobs
+`ROOT = Path(__file__).resolve().parent` becomes two: **`BUNDLE`** (the script + `rulebook.md`
++ `conductor.md`, correctly `__file__`-relative, they ship together) and **`PROJECT`** (the
+`.workflow/` and docs, which `__file__` never should have located). Every `PROJECT` path
+becomes a *function of a resolved root* — `wf_dir(root)`, `marker_path(root)`,
+`draft_path(root, step)`, `gitignore_path(root)`, `global_habits_path(root)` — and readers
+gain `root=None`. `root=None` resolves by the *marker* walk-up and exists **only** for a
+human or model at a CLI; every programmatic caller (hooks and the test suite) passes a
+resolved root explicitly, or it re-enters the defect. `start` alone resolves by the `.git`
+walk-up (no marker exists yet); every verb prints the root it resolved **to STDERR** (ruled
+2026-07-16 — test-clean, still visible), so a mis-rooted command is caught. The suite aims
+the CLI two ways: in-process calls pass `root=r`; **subprocess CLI calls pass `cwd=TMP`** —
+the only lever left after `--project` was rejected, and without it a subprocess `reset` from
+the repo root would delete the live marker and its gitignored drafts.
+
+### Three entry points, each rooted from its own source, each fail-safe
+- **CLI** (`workflow.py` verbs): handed nothing, walks up; prints its root.
+- **Status line** (`claude/statusline_wf.py`, beside `statusline.py` so `import statusline`
+  is same-directory and can never fail): reads stdin once into `data`, calls the extracted
+  `statusline.render(data)` for the base line **always**, then stats the marker inline
+  (no import) — absent → base line unchanged; present → bridges `sys.path` to import
+  `workflow.py` and appends `wf:<step>:<state>`; import failure → `wf:ERR` beside an intact
+  base line. A broken `workflow.py` can never blank the base line (must-not #5, structural).
+- **Nudge + conductor** (`claude/workflow/nudge.py`, beside `workflow.py`): stats the marker
+  inline **before** importing (D-9(ii)); absent → silent (must-not #3). On the broken branch
+  (import/read fails, sentinels missing) it fails **loud** to both audiences using stdlib
+  only and calls **zero** `workflow.py` functions — the failed import is `workflow.py`, so
+  any reach for its atomic writer would crash to a non-zero exit and the platform would
+  discard the fail-loud JSON. All hash bookkeeping lives on the OK branch. The owed-line is
+  gated on receipt state (`stale`/`missing` → "owes a challenge"; `fresh` → "ready to
+  advance", never a false "owes"); the conductor rides along by sentinel
+  (`_block_patterns("conductor","loop")`, reused). The output is a **whitelist** — exactly
+  `systemMessage` (UserPromptSubmit) + `additionalContext`, any other key is a bug, exit
+  always 0 — because three rounds of enumerating block routes each missed a live one.
+
+### State and wiring
+The nudge's quiet-hash keeps D-5's shape: `.workflow/nudge-state.json`, keyed by
+`session_id`, atomic-written (never torn); the rare concurrent-session lost-update is a
+recorded benign residual (one duplicate nudge), not engineered away. All task state lives
+in a self-ignoring `.workflow/` (`start` writes its `.gitignore`: `*` + `!global-habits.md`),
+so `git add -A` is safe in any repo by construction; `reset` clears the drafts and
+`nudge-state.json` and spares `global-habits.md`. `sync.py` ships six named files and gains
+`enable-workflow`/`disable-workflow` (per-piece), writing only the user `~/.claude/settings.json`
+(outside MANIFEST, so `install` never reverts it and `capture` never commits it). Two write
+idioms, never mirrored — hooks *append* (a collection; `check_version.py` co-exists on
+SessionStart), `statusLine` *assigns* (single value) — and `enable_statusline` itself changes
+to preserve-the-script / rewrite-the-interpreter, or re-running it on a new box would silently
+revert the `wf:` segment. Activation is per-machine by construction: `git pull; sync.py install`
+carries the bundle but not the registration, so `enable-workflow` joins the recorded new-box
+setup step.
+
+### Owed before / recorded at settle
+Two probes remain opportunistic-only: auto- (vs manual-) compaction and `systemMessage` on
+SessionStart — the design leans on neither. The six corrections to the Need's own draft are
+being **applied now** (ruled 2026-07-16), ahead of Implementation, so the challenge bundle
+reads an accurate Need. New risks to RISKS.md: `install` hot-swaps `workflow.py` under a live
+marker (structural in the M6/M7 self-hosting loop); concurrent hook processes corrupt a shared
+*append* file (why the marker/receipts are never hook-authored). Deferred to M7: the skip-warner,
+forcing the cold read (α-2), and built-in reviewers.
+<!-- WF:arch:control-layer:end -->

@@ -31,11 +31,59 @@ every machine in sync through git.
 | 2 | Git-based sync as the primary multi-machine flow (clone → pull → install; capture → commit → push) | In use; may automate |
 | 3 | Cross-platform support — one `sync.py` runs install & capture on Windows/macOS/Linux | Done |
 | 4 | Grow the bundle (more skills/agents) as the methodology matures | In progress (v0.3.3: status line) |
-| 5 | Active adversarial workflow (six steps + a challenger) that makes the rules *run* | Building — M1 passed; **M2 passed**; **M3 (walking skeleton): Need-slice machinery built + proven end to end** (3-round toy-Need dogfood; all proof items met); M4 (complete the step set) next (`docs/WORKFLOW.md`) |
+| 5 | Active adversarial workflow (six steps + a challenger) that makes the rules *run* | Building — M1, M2, M3 passed; **M4 (complete the step set) passed as sliced** — the six-step machinery exists, 124 checks green. **M5 (control layer) open: Steps 1–3 (Need, Design, Architecture) settled** — the **two** ambient pieces (status line + nudge; the skip-warner dropped on measured evidence → M7) + the rooting fix, ending in a live install. Nothing fires automatically and nothing is deployed yet (M5 + M6) (`docs/WORKFLOW.md`) |
 
 ## Current status
 
 <!-- WF:anchor:current-status -->
+
+<!-- WF:need:796664b9:start -->
+**2026-07-15** — **M5 (control layer) — Step 1 (Need) settled.** Opened M5 and ran its Need on the real
+machinery. **What M5 is:** the three ambient pieces that make the six-step workflow fire on its own — a status
+line showing the current step *and* its honest `fresh`/`stale`/`missing` receipt state; a `UserPromptSubmit`
+nudge telling the **model** (not the human) that a challenge is owed, once rather than every turn; a
+`PreToolUse` warner on code written before Implementation — **plus the rooting fix without which none of them
+can work**, the `sync.py` wiring, a live smoke-test, and **the install**.
+- **The concrete blocker.** `workflow.py` line 40 is `ROOT = Path(__file__).resolve().parent`: every path — the
+  marker, every draft — hangs off *the script's own folder* and ignores where you are standing. A global status
+  line would hunt for the marker under `~/.claude/` and print "no task open" in every project, forever.
+  **Reproduced live** in a hook prototype: it read the project path out of the payload correctly, then the import
+  ignored it and found nothing. This is **RISKS #16 in a second place**, and the sandbox is the one shape where
+  it does not exist — M3 and M4 ran in a single folder where script, docs and state sat together, so
+  `__file__`-rooting worked and the defect never showed. Not a feasibility question: the platform hands the
+  project path over on stdin. *Which* mechanism, and how `ROOT` stops being `__file__`-derived without breaking
+  the settled CLI contract or the 124 checks, is Design's.
+- **Human ruling — latency is NOT a design constraint.** Told a globally-installed hook costs **~140 ms per
+  prompt and per file write in every repo**, including repos with no task open: *"why should I fucking care about
+  losing 0.1 seconds? I can work in as many repositories as I like."* Now in `OPERATOR.md`. Inertness stays
+  non-negotiable **as a behaviour** — no marker, no sound — but its cost is accepted, which points Design at the
+  simple answer (one global install) and keeps his existing status line working. The ruling killed an absolute
+  **the document had invented and the operator never asked for** ("must feel exactly like plain Claude Code"),
+  discovered unmeetable and then defended across rounds by three separate wrong latency budgets.
+- **Scope out, recorded.** **RISKS #15** — needs re-homing; it landed on M5 by date, not subject, and M5's honest
+  effect is a narrow tilt the *wrong* way (the nudge makes the honest path's owed round arrive sooner while the
+  cheap path stays as invisible as today). **RISKS #11** — inert, contingent on "no hook writes what the script
+  owns"; reopens if Design proposes one. Plus M4's three deferred items, which M5 owes a *written home*, not an
+  implementation.
+- **The question Design must answer, and it is empirical:** which channel — if any — tells the human *why*
+  **before** he answers. Ordering is the whole requirement; an explanation arriving after the write fails as
+  completely as none. Four candidates, `systemMessage` most promising (a universal exit-0 field emitted *beside*
+  `additionalContext` — one invocation, both audiences). **An honest fail is allowed:** the piece then ships as a
+  pause with its limits recorded, or does not ship, and the human rules again on evidence.
+- **Proof bar (11 items).** Rooting proven by measurement; each of the three signals proven **registered /
+  executes / output honored** as three separate questions (in M2 a nudge passed two green unit tests while
+  silently inert live); inertness proven by a **control**; the skip-warner's reason judged legible **by a naive
+  reader on a captured artifact, with the reader's prompt recorded**; breakage observed with **no result written
+  in advance**; latency **re-measured and recorded, not gated**; installed, used, reversible.
+Converged clean on the **ninth** round (findings 7 → 8 → 5 → 4 → 5 → 3 → 1 → 3 → 0). Sandbox dogfood; live
+`~/.claude` untouched; not committed. **Step 2 (Design) next.**
+
+**Corrected 2026-07-16 (M5 Design D-6; six corrections applied to the Need draft):** M5 ships **two**
+ambient pieces, not three — the `PreToolUse` skip-warner was dropped on measured evidence (no channel
+puts a reason on screen at the moment of a permission decision) and re-homed to **M7**. The proof items
+and the "which channel warns the human" question above resolve with it. Steps 2 (Design) and 3
+(Architecture) have since settled — see the Decision Log and `ARCHITECTURE.md`'s `control-layer` section.
+<!-- WF:need:796664b9:end -->
 
 **2026-07-15** — **M4 (complete the step set) — COMPLETE. Step 6 (Shipping) settled; the six-step machinery is
 built.** The Shipping challenger found **no blocking issues** and verified rather than accepted — it re-ran the

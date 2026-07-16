@@ -69,6 +69,41 @@ has exactly one job:
 You're not forced into all of them — tell Claude to skip any you don't want. The payoff is a
 project that explains itself later, instead of "why is it built like this?" archaeology.
 
+## The six-step workflow — opt-in (being built)
+
+Everything above is **always on**. This is the other half of the repo: machinery that makes the
+rules actually *run* on real work, instead of depending on someone remembering them.
+
+**The idea.** A task walks six steps. At each one, a **separate** AI — the *challenger* — reads
+what the first AI proposed and tries to prove it wrong. You judge who's right, and nothing moves
+on until you accept it. The docs write themselves as you go, which is what lets the next task
+start from a blank slate and still know everything that was decided.
+
+| Step | The question it settles |
+|---|---|
+| 1. **Need** | What is actually needed — and what must this explicitly *not* do? |
+| 2. **Design** | Which approach we take, and why the other options lost. |
+| 3. **Architecture** | How it's structured inside: the parts, and the boundaries between them. |
+| 4. **Implementation** | The code, in small blocks — each one tested, commented, and red-teamed. |
+| 5. **Judgment** | Does the finished thing actually meet the Need from step 1? Go or no-go. |
+| 6. **Shipping** | What breaks in the real world; record the risk, harvest the lesson, commit. |
+
+**It stays off until you turn it on, one task at a time.** The machinery only wakes up when a
+`.workflow/marker.json` file exists in the project you're working in, and exactly one thing
+creates it — you, running `start`:
+
+    python workflow.py start "add dark mode"
+
+No marker, no workflow. Small projects, quick fixes, and throwaway scripts are untouched by it.
+Ending a task (`workflow.py reset`) removes the marker again.
+
+**Status — not finished, and not installed.** The machinery is built and passes its tests, but
+nothing fires it automatically yet (every command above is typed by hand), and `sync.py` does
+not deploy it — so it is **not** in your `~/.claude` today. Two milestones remain: the *control
+layer* (a status-line step indicator plus two soft-flag hooks, so it runs on its own), then
+packaging. The full design and build plan live in `docs/WORKFLOW.md`; current status is in
+`docs/OVERVIEW.md`.
+
 ## Contents
 - `claude/CLAUDE.md` — the always-on core (loaded in every project)
 - `claude/METHODOLOGY.md` — the full rule reference (read on demand)
@@ -77,6 +112,9 @@ project that explains itself later, instead of "why is it built like this?" arch
 - `claude/skills/init-project-docs/SKILL.md` — scaffolds a project's standard docs
 - `claude/hooks/check_version.py` — SessionStart hook that flags when a newer version exists
 - `claude/statusline.py` — a compact status line (model · effort · context %+tokens · 5h quota %+reset time); turn it on with `python sync.py enable-statusline`
+- `claude/workflow/` and `claude/agents/challenger.md` — the six-step workflow machinery: the script
+  (`workflow.py`), the challenger's nine rules (`rulebook.md`), the per-step loop (`conductor.md`),
+  and the attacker itself. **In the repo, not yet deployed** — see the section above.
 - `sync.py` — one script: deploy/update `~/.claude`, capture edits back, or check/enable the update hook
 
 ## Set it up — and keep it current — with one command
