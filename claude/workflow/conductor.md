@@ -15,9 +15,10 @@ This project runs under the six-step adversarial workflow. The live task's step 
 begins when the human runs `python workflow.py start "<title>"`. Check where you are any time with
 `python workflow.py status`.
 
+<!-- WF:conductor:loop:start -->
 ## For the current step, drive this loop
-1. **Propose.** Do the step's work and write the draft into its artifact file, `docs/draft-<step>.md`
-   (e.g. `docs/draft-need.md` — the file the challenger attacks and the gate hashes). For an existing
+1. **Propose.** Do the step's work and write the draft into its artifact file, `.workflow/draft-<step>.md`
+   (e.g. `.workflow/draft-need.md` — the file the challenger attacks and the gate hashes). For an existing
    project, survey what's already there first, then draft on top of it.
 2. **Prepare the challenge:** `python workflow.py prepare <step>`. This assembles the challenger's
    bundle at `.workflow/context.md` — the shared rulebook as a header, then an ordered COLD section
@@ -64,3 +65,4 @@ begins when the human runs `python workflow.py start "<title>"`. Check where you
   brief it on them — just point it at `.workflow/context.md`.
 - **Warn, never block.** Nothing here hard-stops you; the gate refuses by default but yields to a
   recorded `--force`. The human keeps the wheel.
+<!-- WF:conductor:loop:end -->

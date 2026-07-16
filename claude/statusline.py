@@ -56,16 +56,12 @@ def _k(n):
     return (s[:-2] if s.endswith(".0") else s) + unit
 
 
-def main():
-    # Claude Code pipes the session JSON to us on stdin. If we're ever handed nothing or garbage
-    # (e.g. a human runs the script directly), fall back to an empty dict instead of raising — a
-    # status line that crashed would show nothing and noise up the session, so every field below
-    # is written to degrade quietly rather than assume its data is present.
-    try:
-        data = json.load(sys.stdin)
-    except (json.JSONDecodeError, ValueError):
-        data = {}
-
+def render(data):
+    """Build the status line string from the already-parsed session `data` and return it (no
+    trailing newline). Split out of main() (Decision D-4(b)) so statusline_wf.py can reuse the
+    EXACT base line by passing the `data` it already parsed - never touching stdin a second time.
+    stdin is a read-once pipe: if the wf renderer re-read a drained pipe the line would blank. The
+    plain status line is unchanged - main() below still parses stdin and prints render(data)."""
     # Build the line segment-by-segment, then join with single spaces. A list lets us simply
     # *skip* an optional field, so an absent segment leaves no separator or empty "key:" behind.
     segments = []
@@ -123,9 +119,25 @@ def main():
     if quota_parts:
         segments.append(_pair("5h", " ".join(quota_parts)))
 
-    # Emit the finished line. Single spaces separate segments (the dim keys already mark each
-    # boundary), and a trailing RESET is belt-and-braces. Only this first line is shown.
-    sys.stdout.write(" ".join(segments) + RESET + "\n")
+    # Join the finished segments. Single spaces separate them (the dim keys already mark each
+    # boundary), and a trailing RESET is belt-and-braces. The newline is added by the caller.
+    return " ".join(segments) + RESET
+
+
+def main():
+    # Claude Code pipes the session JSON to us on stdin. If we're ever handed nothing or garbage
+    # (e.g. a human runs the script directly), fall back to an empty dict instead of raising - a
+    # status line that crashed would show nothing and noise up the session, so render() degrades
+    # quietly rather than assume any field is present. Only this first line is shown.
+    try:
+        data = json.load(sys.stdin)
+    except (json.JSONDecodeError, ValueError):
+        data = {}
+    # Valid JSON that is not an OBJECT (a bare array/number/string) parses cleanly yet has no .get,
+    # which render() would choke on - coerce to {} so the line still renders rather than blanking.
+    if not isinstance(data, dict):
+        data = {}
+    sys.stdout.write(render(data) + "\n")
 
 
 if __name__ == "__main__":
