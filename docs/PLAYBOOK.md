@@ -224,3 +224,26 @@ either fixed-and-locked by a test that fails on the pre-fix code, or recorded as
 severity and owner. A live run that finds nothing is a result too — but only if it was free to.
 **Pointers:** `DECISIONS.md` 2026-07-15 (M4 Step 5) and 2026-07-13 (M2's live half); `RISKS.md` #15;
 `tests/workflow/test_workflow.py` (checks S/S2/S3 — the fix L2 earned) (2026-07).
+
+## Tell "green" from "done": judge a build against the Need's proof bar
+**When you need this:** you've built and unit-tested something (suite green, code reviewed) and you're tempted
+to call it done — but the original Need's acceptance list includes *observed* behavior, not just "the tests
+pass."
+**The path:**
+1) At the judgment step, re-read the Need's own "how we'll know it worked" list and hold the build against
+   EACH item — confirmed / live-gated / not done — scored against the Need, never against the test count.
+2) Separate "proven by tests" from "proven by observation." Unit-green is a filter, not a substitute: a hook can
+   pass crafted-stdin tests and still be inert or unrendered in a real session (the M2 trap). Say which items
+   are live-gated in plain words — "the code is proven; these N items are the deploy step's mandate."
+3) Run the deploy AS the evidence-gathering step, not a victory lap: install, then observe each live item — the
+   signal fires AND is honored on screen, inertness by a real control, the one-command removal — and record the
+   numbers. (For *how* to run that live actor test, see the smoke-test recipe above.)
+4) Finalize the record only AFTER the live proof. A "done" written before the observation is exactly what the
+   judgment step exists to catch.
+**Gotchas:** whoever hands off tends to under-scope the deploy as "ship + push" — the live proof is the larger
+half. Some live items are the operator's to observe (status-line chrome you can't see), so plan them as a
+collaborative checklist, not a solo run.
+**How you know it worked:** every proof-bar item has a named source — a test, a measurement, or a witnessed
+observation — and the ones that needed a real session were seen in one.
+**Pointers:** M5 Judgment→Shipping (`OVERVIEW.md` `WF:judgment:796664b9`, `DECISIONS.md` 2026-07-16); the
+live-proof screenshot; the deployed-scripts probe pattern (2026-07).

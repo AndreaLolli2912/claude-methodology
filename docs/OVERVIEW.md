@@ -31,11 +31,47 @@ every machine in sync through git.
 | 2 | Git-based sync as the primary multi-machine flow (clone → pull → install; capture → commit → push) | In use; may automate |
 | 3 | Cross-platform support — one `sync.py` runs install & capture on Windows/macOS/Linux | Done |
 | 4 | Grow the bundle (more skills/agents) as the methodology matures | In progress (v0.3.3: status line) |
-| 5 | Active adversarial workflow (six steps + a challenger) that makes the rules *run* | Building — M1, M2, M3 passed; **M4 (complete the step set) passed as sliced** — the six-step machinery exists, 124 checks green. **M5 (control layer) open: Steps 1–3 (Need, Design, Architecture) settled** — the **two** ambient pieces (status line + nudge; the skip-warner dropped on measured evidence → M7) + the rooting fix, ending in a live install. Nothing fires automatically and nothing is deployed yet (M5 + M6) (`docs/WORKFLOW.md`) |
+| 5 | Active adversarial workflow (six steps + a challenger) that makes the rules *run* | Building — M1–M4 passed; **M5 (control layer) COMPLETE and DEPLOYED** (2026-07-16) — the **two** ambient pieces (workflow-aware status line + nudge; the skip-warner dropped on measured evidence → M7) + the D-2 rooting fix, installed into `~/.claude` and proven live; 205 checks green. **The workflow now fires on its own.** Later milestones (M6/M7) remain (`docs/WORKFLOW.md`) |
 
 ## Current status
 
 <!-- WF:anchor:current-status -->
+
+**2026-07-16** — **M5 (control layer) — COMPLETE and DEPLOYED.** The six-step workflow now fires on its own:
+a workflow-aware status line (`wf:<step>:<state>`, honest `fresh`/`stale`/`missing`) and a `UserPromptSubmit` +
+`SessionStart` nudge that tells the *model* a challenge is owed — plus the D-2 rooting fix that made one global
+install possible. Installed into `~/.claude` (`sync.py install` + `enable-workflow all`) and proven **live**:
+both signals render on screen in a real session (the nudge oriented a fresh, context-free Claude, which then
+refused to advance a hollow draft), inert with no task open, breakage shows as `wf:ERR` and never blocks,
+latency +7–16 ms over a 55 ms baseline (recorded, not gated), and one command removes it cleanly. All 11 of the
+Need's proof items are met (item 4, the skip-warner's, descoped with the piece → M7); 205 checks green. Full
+account in the Decision Log and the `WF:judgment` verdict below; new residuals are RISKS #20–24. **The active
+code milestones (M1–M5) are done; later milestones remain — see `docs/WORKFLOW.md`.**
+
+<!-- WF:judgment:796664b9:start -->
+**2026-07-16** — **M5 (control layer) — Step 5 (Judgment) recorded.** Held the built control layer
+against the Need's own 11-item proof bar (§8). **The build is correct and complete:** the two ambient
+pieces (a workflow-aware status line showing `fresh`/`stale`/`missing`, and a `UserPromptSubmit` +
+`SessionStart` nudge that tells the *model* a challenge is owed, once), the **D-2 rooting fix** that
+makes them possible, and the `sync.py` wiring. 205 checks green (was 124); each of the four
+Implementation blocks was cleared by a full five-hat attacker team (fidelity / bugs / verify / simplify /
+security), every finding fixed and regression-tested; the rooting fix was demonstrated **live** — the
+shipped code, invoked from outside the project, resolved *that project's* marker and advanced it.
+- **But the proof bar is deliberately a *live* bar, and 7 of its 11 items are not yet met.** Closed:
+  #1 rooting-by-measurement, #4 skip-warner (descoped with the piece, → M7), #9 suite green + grown,
+  #11 the three M4 debts homed in `WORKFLOW.md`. **Unmet — and gated on the install:** #2 both signals
+  *fire in a real session* (registered / executes / output-honored — the M2 trap: green units, inert
+  live), #3 inertness by a live control, #5 every state forced on the *real* status line, #6 the nudge
+  shutting up across real turns, #7 breakage observed live, #8 latency re-measured, #10 installed / used
+  / reversible.
+- **Verdict: the code half is proven; the live-proof half is exactly Shipping's mandate.** The Need is
+  explicit — "the sandbox is a filter before the install, *not a substitute for it*." So **M5 is not
+  done** until Shipping installs into `~/.claude`, observes both signals firing in a live session,
+  re-measures latency, and shows the one-command removal. Recorded on a **human override** (the
+  independent Judgment challenger was consciously skipped — the build was already cleared by 15 attacker
+  passes). Advanced judgment → shipping. Live `~/.claude` still untouched; not committed. **Step 6
+  (Shipping) next.**
+<!-- WF:judgment:796664b9:end -->
 
 <!-- WF:need:796664b9:start -->
 **2026-07-15** — **M5 (control layer) — Step 1 (Need) settled.** Opened M5 and ran its Need on the real

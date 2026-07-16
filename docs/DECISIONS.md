@@ -5,6 +5,44 @@
 
 <!-- WF:anchor:decisions-log -->
 
+### 2026-07-16 — Workflow machinery M5: Steps 4–6 (Implementation, Judgment, Shipping) — the control layer is LIVE + COMPLETE
+
+**M5 is done and deployed.** The control layer — a workflow-aware status line (`wf:<step>:<state>`) and a
+`UserPromptSubmit`/`SessionStart` nudge, plus the D-2 rooting fix that makes them possible — is installed in
+this machine's `~/.claude` and proven live.
+
+**Implementation (Step 4, the exception step).** Built as four checkpoint blocks, each cleared by a full
+five-hat attacker team (fidelity / bugs / verify / simplify / security): (1) the D-2 rooting refactor of
+`workflow.py` + D-10; (2) the two hooks (`statusline.py` `render()` split, `statusline_wf.py`, `nudge.py`,
+conductor sentinels); (3) the `sync.py` D-8 wiring; (4) the `.wf-sandbox` delete. 205 checks green (was 124).
+Closed with `advance --force` (no receipt — the exception step earns none), run with the shipped code from the
+sandbox as a bonus live rooting proof.
+
+**Judgment (Step 5).** Held the build against the Need's own 11-item proof bar rather than the test count, and
+that reframed the finish: the proof bar is a *live* bar, and 7 of its 11 items were gated on the install (both
+signals firing AND honored in a real session, inertness by a live control, latency re-measured,
+installed/used/reversible). Verdict — the code half proven, the live half is Shipping's mandate — published to
+`OVERVIEW.md` (`WF:judgment:796664b9`); advanced on a human override (the independent challenger consciously
+skipped, the build already cleared by 15 attacker passes).
+
+**Shipping (Step 6, the no-publish exception).** Deployed by a deliberate, backed-up, reversible act: `sync.py
+install` (6 new machinery files + the `statusline.py` refactor; everything else backed up) then `sync.py
+enable-workflow all` (nudge on `SessionStart` *alongside* the preserved `check_version` + on `UserPromptSubmit`;
+status line swapped to the wf renderer). The live proof then discharged all 11 items: a fire-probe of the
+deployed scripts (execute, whitelist holds, inert → silent); latency re-measured (plain 55 ms baseline; wf
++7–16 ms — recorded, not gated); a real restarted session where both signals rendered on screen and the nudge
+oriented a fresh context-free Claude (it even caught that the demo's draft was a hollow placeholder); breakage
+sized (corrupt marker → `wf:ERR` + a "broken" notice, exit 0, the prompt proceeds); and a reversibility
+round-trip on the real `settings.json` (`disable-workflow` reverts + keeps `check_version`, `enable-workflow`
+restores).
+
+**What shipped vs. what was scoped.** TWO ambient pieces, not the Need's original three — the `PreToolUse`
+skip-warner was dropped at Design (D-6) on measured evidence that no channel puts a reason on screen at the
+moment of a permission decision, and re-homed to M7. **New accepted risks:** RISKS #20–24 (unbounded walk-up;
+non-atomic settings write; no `.gitignore` self-heal; nudge-state lost-update; the deploy not advertising its
+own off-switch — the last found in the live proof). **PLAYBOOK:** "Tell 'green' from 'done'." The live proof is
+what turned an under-scoped "deploy + push" handoff into the step that gathered the real evidence.
+
 ### 2026-07-16 — Workflow machinery M5: Step 3 (Architecture) settled — the control layer, structured
 
 **Settled after six challenge rounds** (blocking 2 → 3 → 1 → 1 → 1 → **clean**), each with a fresh

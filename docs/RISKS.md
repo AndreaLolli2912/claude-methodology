@@ -24,6 +24,11 @@
 | 17 | **Two writes surface a raw traceback instead of a clean refusal** — `cmd_prepare`'s bundle write and `_save_marker` (all verbs) are unguarded on `OSError`. | Low | Accepted at M4 — fails **loud**, not silent, so the honest floor holds; ugly under M5's hooks, revisit there |
 | 18 | **The canary proves the bundle was *read*, not that it was *fresh*.** `prepare` bundles whatever bytes its sources happen to hold; nothing checks them against the real files, so a stale warm source reaches the challenger under a green canary. | Medium | **Found at M5** (live, inside the Need step's own harness) — the copy-drift instance closes with M5's rooting fix; the general property does not. **Re-homed to M7** |
 | 19 | **`sync.py install` hot-swaps the live machinery under a running task.** Once M5 deploys one global copy (D-1), the machinery that *runs* a task is the last installed snapshot of the machinery being *edited* — and freshness is hash-based, so a `receipt_state` or `artifact_path` change landing between `prepare` and `record` silently changes what a green receipt means. | Medium | **Found at M5 Design** (2026-07-15), reasoned not yet observed. **Structural, not occasional** — M6/M7 edit `workflow.py` and run through this workflow in this repo, so "install while a marker is live" is the development loop. No mitigation by construction; `sync.py status` is a readout he must remember, and the habit that causes it (`edit, then install`) is the recorded one |
+| 20 | **The marker/git walk-up has no HOME or depth bound.** `_walk_up_for_marker` and `_walk_up_for_git` climb toward the filesystem root; a `.workflow/marker.json` or `.git` in an *ancestor* of the cwd is taken as this project's. | Low | Accepted at M5 — harmless in practice (his projects are self-contained repos; HOME is not one); the deleted-cwd variant a reviewer raised isn't reproducible on Windows |
+| 21 | **`_write_settings` is non-atomic and its `.bak` names are second-granular.** A crash mid-write can truncate `settings.json`; two writes in the same second share one `*.bak` name, so the earlier backup is overwritten. | Low | Accepted at M5 (pre-existing `enable-*` pattern) — recover from an earlier `.bak` or git; observed benign during the M5 reversibility demo |
+| 22 | **No self-heal if `.workflow/.gitignore` is removed mid-task.** `start` writes the ignore rule once; if it is externally deleted, drafts under `.workflow/` become `git add`-able again. | Low | Accepted at M5 — single-user, visible in `git status` before any commit; `start` re-creates it on the next task |
+| 23 | **Concurrent same-repo sessions can lose a nudge-state update → one duplicate nudge.** Two sessions racing on `.workflow/nudge-state.json` can clobber each other's quiet-hash. | Low | Accepted/self-healing at M5 — the next turn re-quiets; the message stays true, no correctness impact |
+| 24 | **The deployed hooks don't advertise their own off-switch.** Asked to "turn off the flow," a context-free Claude hand-edits `~/.claude/settings.json` instead of running `sync.py disable-workflow all`. | Low | Accepted at M5 — *found in the live proof* (2026-07-16); contained by the permission prompt + `settings.json` backups; a discoverability nicety for M7 |
 
 ## Detail
 
@@ -218,3 +223,39 @@ the bundle, and the canary will still be green. *Fix when it matters:* hash the 
 alongside the artifact, so a bundle assembled from stale bytes reads `stale` the same way a corrected draft does.
 Recorded rather than fixed at M5: it is not in the control layer's scope, and it belongs with #15's re-homing —
 both are about the fidelity of what a challenger is shown.
+
+**#20 — unbounded walk-up (accepted at M5).** The D-2 rooting refactor resolves a project by climbing from the
+cwd until it finds `.workflow/marker.json` (`_walk_up_for_marker`, every verb but `start`) or `.git`
+(`_walk_up_for_git`, `start` only), with no HOME boundary and no depth cap. If an *ancestor* of where you stand
+holds either, it is taken as this project — a stray marker in `~` would capture every project beneath it. In
+practice his projects are self-contained git repos and HOME is not one, so it does not bite; the deleted-cwd
+variant a reviewer raised isn't reproducible on Windows. Bound it (stop at HOME, cap the depth) the day a
+home-level marker is plausible.
+
+**#21 — non-atomic settings write, second-granular backups (accepted at M5).** `enable-*`/`disable-*` read →
+mutate → `write_text` the whole `settings.json` rather than writing a temp file and renaming, so a crash
+mid-write can leave it truncated. And `_timestamped_backup` stamps to the second, so two writes inside one
+second reuse the same `*.bak` name — the M5 reversibility demo did exactly this (`disable` then `enable` both
+wrote `settings.json.20260716-160358.bak`, the second overwriting the first). Both are benign for a single
+operator with git and per-write backups; revisit with an atomic replace if settings writes ever go concurrent or
+programmatic.
+
+**#22 — `.workflow/.gitignore` has no self-heal (accepted at M5).** `start` writes `.workflow/.gitignore`
+(`*` + `!global-habits.md`) once, so a task's transient state (marker, drafts, nudge-state) stays untracked. If
+that file is deleted mid-task those files become stageable again — but the gap shows in `git status` before any
+commit, and the next `start` re-creates it. Single-user, low-stakes; recorded, not guarded.
+
+**#23 — nudge-state lost-update → a duplicate nudge (accepted at M5).** The nudge quiets itself by hashing what
+it would say into `.workflow/nudge-state.json` per session. Two sessions open on the *same* repo can
+read-then-write that file concurrently and lose one update, so one re-emits a nudge it would otherwise have
+suppressed. No correctness impact — the message is still true — and the next turn re-quiets. Recorded as
+self-healing.
+
+**#24 — the deploy doesn't advertise its off-switch (found in the M5 live proof, 2026-07-16).** During Part B,
+asked to "turn off the flow," a fresh context-free Claude went to hand-edit `~/.claude/settings.json` (via an
+`update-config` skill) rather than run `sync.py disable-workflow all`, and was interrupted. The running hooks
+carry no pointer to their own clean removal, so an agent asked to disable them improvises on global settings —
+risking a partial disable (a dropped `check_version`, malformed JSON). Contained today by the permission prompt
+the edit must pass and the `settings.json` backups, but a real discoverability gap: a one-line "to turn this
+off, run `sync.py disable-workflow all`" in the conductor slice or a `sync.py` hint would close it. Deferred to
+M7 with the other harness-honesty items.
