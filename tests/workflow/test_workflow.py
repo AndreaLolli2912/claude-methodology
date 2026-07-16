@@ -21,12 +21,27 @@ TMP = Path(tempfile.mkdtemp(prefix="wf_test_"))
 shutil.copy(SRC / "workflow.py", TMP / "workflow.py")
 shutil.copy(SRC / "rulebook.md", TMP / "rulebook.md")
 (TMP / "docs").mkdir()
+(TMP / ".workflow").mkdir()   # D-10: drafts + task state live here now; create before any draft write
+(TMP / ".git").mkdir()        # D-2a: `start` roots the task at the nearest .git ancestor - give it one
 
 sys.path.insert(0, str(TMP))
-import workflow  # noqa: E402  (import after path insert + copy: ROOT resolves to TMP)
+import workflow  # noqa: E402  (import after path insert + copy so `import workflow` finds the copy)
+
+# Aim every in-process reader at THIS test's project root (root=TMP), exactly as the M5 status
+# line and nudge pass the platform-handed root. The suite must never rely on the process cwd for
+# aiming - that is the D-3 catastrophe the subprocess `cwd=` below guards against. (A qualified
+# `workflow.load_marker` resolves on the module, never to these local wrappers, so there is no
+# recursion to guard against.)
+def load_marker():
+    return workflow.load_marker(root=TMP)
+
+
+def receipt_state(step):
+    return workflow.receipt_state(step, root=TMP)
+
 
 WF = TMP / ".workflow"
-NEED = TMP / "docs" / "draft-need.md"          # the step's draft = artifact_path("need")
+NEED = WF / "draft-need.md"                     # the step's draft = draft_path(TMP, "need") (D-10: in .workflow/)
 OPERATOR = TMP / "docs" / "OPERATOR.md"
 RULEBOOK = TMP / "rulebook.md"
 CONTEXT = WF / "context.md"
@@ -41,8 +56,10 @@ def check(name, cond):
 
 
 def run(*args):
+    # cwd=TMP so the subprocess (which resolves its root by walking UP from cwd) roots at THIS
+    # test's project, never the real repo above it - the D-3/D-10 guard (Architecture Section 2).
     p = subprocess.run([sys.executable, str(TMP / "workflow.py"), *args],
-                       capture_output=True, text=True)
+                       capture_output=True, text=True, cwd=str(TMP))
     return p.returncode, p.stdout, p.stderr
 
 
@@ -69,7 +86,7 @@ check("A no-task status is inert, exit 0", rc == 0 and "no task open" in out)
 
 # B. start -> exit 0, marker at need
 rc, out, _ = run("start", "Toy need task")
-check("B start succeeds at step need", rc == 0 and workflow.load_marker()["current_step"] == "need")
+check("B start succeeds at step need", rc == 0 and load_marker()["current_step"] == "need")
 
 # C. start again -> refuse to clobber
 rc, _, err = run("start", "Another")
@@ -78,7 +95,7 @@ check("C second start refuses (no clobber)", rc == 1 and "already open" in err)
 # UNIT. an unknown recipe source token raises loudly (the guard is real, not just a comment)
 raised = False
 try:
-    workflow._resolve_sources(["bogus_token"], "need")
+    workflow._resolve_sources(["bogus_token"], "need", TMP)
 except KeyError:
     raised = True
 check("U _resolve_sources raises on an unknown token", raised)
@@ -97,7 +114,7 @@ shutil.copy(SRC / "rulebook.md", RULEBOOK)   # restore
 
 # D. advance with no receipt -> gate refuses, still at need
 rc, _, err = run("advance")
-check("D gate refuses advance without receipt", rc == 1 and workflow.load_marker()["current_step"] == "need")
+check("D gate refuses advance without receipt", rc == 1 and load_marker()["current_step"] == "need")
 
 # E. prepare builds the alpha-1 bundle (rulebook header + ordered COLD/WARM + canary)
 rc, out, _ = run("prepare", "need")
@@ -111,45 +128,45 @@ i_warm = ctx.find("===== WARM")
 i_operator = ctx.find("OPERATOR-MARKER")
 ordered = -1 < i_cold < i_artifact < i_canary < i_warm < i_operator
 check("E prepare plants canary + sets pending",
-      rc == 0 and c1 and workflow.load_marker()["pending"]["canary"] == c1)
+      rc == 0 and c1 and load_marker()["pending"]["canary"] == c1)
 check("E bundle carries the rulebook as a framing header (A-1)", header_first)
 check("E bundle is ordered COLD(artifact+canary) -> WARM(operator) (alpha-1)", ordered)
 
 # F. record with NO challenge file -> fail closed, no receipt
 rc, _, err = run("record", "need")
 check("F record fail-closed on missing result",
-      rc == 1 and "no receipt written" in err.lower() and "need" not in workflow.load_marker().get("receipts", {}))
+      rc == 1 and "no receipt written" in err.lower() and "need" not in load_marker().get("receipts", {}))
 
 # G. result echoes WRONG canary -> fail closed
 write_challenge("WF-CANARY-deadbeefdeadbeef")
 rc, _, err = run("record", "need")
 check("G record fail-closed on wrong canary",
-      rc == 1 and "canary" in err.lower() and "need" not in workflow.load_marker().get("receipts", {}))
+      rc == 1 and "canary" in err.lower() and "need" not in load_marker().get("receipts", {}))
 
 # H. correct canary BUT artifact missing -> fail closed (unreadable artifact)
 write_challenge(c1)
 NEED.unlink()
 rc, _, err = run("record", "need")
 check("H record fail-closed on unreadable artifact",
-      rc == 1 and "unreadable" in err.lower() and "need" not in workflow.load_marker().get("receipts", {}))
+      rc == 1 and "unreadable" in err.lower() and "need" not in load_marker().get("receipts", {}))
 
 # I. recreate the SAME artifact; correct canary -> success (live hash matches prepare snapshot)
 write_need()
 rc, out, _ = run("record", "need")
 check("I record succeeds with artifact + correct canary",
-      rc == 0 and workflow.load_marker()["receipts"]["need"]["challenge_ran"] is True)
+      rc == 0 and load_marker()["receipts"]["need"]["challenge_ran"] is True)
 
 # J. shared truth function agrees: fresh
-check("J receipt_state(need) == fresh", workflow.receipt_state("need") == "fresh")
+check("J receipt_state(need) == fresh", receipt_state("need") == "fresh")
 
 # K-N. multi-round: a revision stales the receipt and BLOCKS advance until re-challenged (proof #1),
 #      and the TOCTOU guard refuses a record whose artifact changed after prepare.
 write_need("REVISED between rounds.")
-check("K a revision flips fresh -> stale", workflow.receipt_state("need") == "stale")
+check("K a revision flips fresh -> stale", receipt_state("need") == "stale")
 
 rc, _, err = run("advance")
 check("L gate BLOCKS advance while stale",
-      rc == 1 and workflow.load_marker()["current_step"] == "need")
+      rc == 1 and load_marker()["current_step"] == "need")
 
 rc, _, _ = run("prepare", "need")                 # round 2: snapshot the revised draft
 c2 = canary_in_context()
@@ -158,34 +175,34 @@ write_need("CHANGED AGAIN after prepare.")        # edit AFTER prepare, BEFORE r
 rc, _, err = run("record", "need")
 check("M TOCTOU: record refuses when the draft changed after prepare",
       rc == 1 and "changed between prepare and record" in err.lower()
-      and workflow.receipt_state("need") == "stale")
+      and receipt_state("need") == "stale")
 
 rc, _, _ = run("prepare", "need")                 # honest re-challenge over the current bytes
 c3 = canary_in_context()
 check("M2 re-prepare mints a fresh canary each round", c3 and c3 not in (c1, c2))
 write_challenge(c3)
 rc, _, _ = run("record", "need")
-check("M3 re-record makes it fresh again", workflow.receipt_state("need") == "fresh")
+check("M3 re-record makes it fresh again", receipt_state("need") == "fresh")
 
 rc, out, _ = run("advance")
 check("N gate OPENS on the fresh re-challenge (need -> design)",
-      rc == 0 and workflow.load_marker()["current_step"] == "design")
+      rc == 0 and load_marker()["current_step"] == "design")
 
 # O. force-advancing a never-challenged step records the override AND reads honestly 'missing'
 rc, out, _ = run("advance", "--force")            # design (has a recipe in M4, but was never challenged) -> architecture
-m = workflow.load_marker()
+m = load_marker()
 check("O --force records the override + moves on (design -> architecture)",
       rc == 0 and m["current_step"] == "architecture" and m["receipts"]["design"].get("override") is True)
 check("O2 overridden-never-challenged step reads 'missing', not 'stale'",
-      workflow.receipt_state("design") == "missing")
+      receipt_state("design") == "missing")
 
 # P. reset clears state -> inert again
 rc, _, _ = run("reset")
-check("P reset clears state", rc == 0 and workflow.load_marker() is None)
+check("P reset clears state", rc == 0 and load_marker() is None)
 
 # Q. a non-ASCII title does not crash start/status (Windows cp1252 arrow), and start is consistent
 rc, out, _ = run("start", "Need → Design workflow")
-started_ok = rc == 0 and workflow.load_marker() is not None and "→" in workflow.load_marker()["task_title"]
+started_ok = rc == 0 and load_marker() is not None and "→" in load_marker()["task_title"]
 rc2, _, _ = run("status")
 check("Q non-ASCII title: start exits 0 and status does not crash", started_ok and rc2 == 0)
 run("reset")
@@ -214,7 +231,7 @@ ENTRY.mkdir()                                   # ENTRY path is now a dir -> unl
 write_challenge(canary_in_context())
 rc, _, err = run("record", "need")
 check("R2 record fails closed when a leftover entry cannot be cleared (no receipt written)",
-      rc != 0 and workflow.receipt_state("need") == "missing")
+      rc != 0 and receipt_state("need") == "missing")
 ENTRY.rmdir()                                   # clean up the simulated lock
 run("reset")
 
@@ -243,7 +260,7 @@ CHALLENGE.parent.mkdir(exist_ok=True)
 CHALLENGE.mkdir()                               # CHALLENGE path is now a dir -> unlink() raises OSError
 rc, _, err = run("prepare", "need")
 check("S2 prepare fails closed when the stale result cannot be cleared (nothing prepared)",
-      rc != 0 and workflow.load_marker()["pending"] is None and not CONTEXT.exists())
+      rc != 0 and load_marker()["pending"] is None and not CONTEXT.exists())
 CHALLENGE.rmdir()                               # clean up the simulated lock
 run("reset")
 

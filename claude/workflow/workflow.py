@@ -30,24 +30,27 @@ import argparse
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
-# Layout. Everything is anchored on THIS file's folder so the project can be
-# moved or renamed without breaking (the same trick sync.py uses). In the
-# deployed shape the script and its rulebook are COPIED INTO the project
-# together, so the script's folder is also the project root: script-assets
-# (rulebook.md) and project-state (.workflow/, docs/) share ROOT here. If M6
-# ever splits the two, this block is the single place that changes.
+# Layout. TWO roots, split apart in M5 (Decision D-2) because ONE name was doing TWO jobs:
+#
+#   BUNDLE  - where THIS script and its shipped assets (rulebook.md, conductor.md)
+#             live. Correctly __file__-relative: those assets travel WITH the script
+#             wherever it is copied, so this is a static constant, computed once.
+#   PROJECT - where a task's live state lives (.workflow/, plus the committed docs/).
+#             This is NOT __file__-relative: a hook is launched from ~/.claude but must
+#             act on whichever project the human is standing in. So every PROJECT path is
+#             a FUNCTION of a `root` the caller resolves and passes in - never a module
+#             constant (the old `ROOT = __file__.parent` was that constant; it pinned state
+#             to the script's own folder, which is Decision D-2's defect).
+#
+# How `root` is found (D-2a): WALK UP from a start directory to the nearest ancestor that
+# proves it is the project - either it already holds .workflow/marker.json (an OPEN TASK)
+# or it holds .git (a REPO ROOT). Two DIFFERENT walk-ups answer two DIFFERENT questions and
+# are deliberately NOT merged into one project_root() - a single default cannot serve both
+# (only `start` uses the git one, because no marker exists yet to find).
 # ---------------------------------------------------------------------------
-ROOT = Path(__file__).resolve().parent
-RULEBOOK = ROOT / "rulebook.md"       # the nine shared rules, bundled by `prepare` (Decision A-1)
-
-WF = ROOT / ".workflow"               # runtime state dir (gitignored, ephemeral; created by `start`)
-MARKER = WF / "marker.json"           # the one state file the whole system reads
-CONTEXT = WF / "context.md"           # the bundle `prepare` hands the challenger
-CHALLENGE = WF / "challenge.md"       # where the challenger writes its verdicts back
-ENTRY = WF / "publish-entry.md"       # the model's drafted settled-prose that `publish` places -
-#                                       EVERY publishing step drafts here (need/design/architecture/
-#                                       judgment), which is why the name is publish-, not overview-: it
-#                                       served only Need -> OVERVIEW in M3, before the engine generalized.
+BUNDLE = Path(__file__).resolve().parent   # static: ships with the script
+RULEBOOK = BUNDLE / "rulebook.md"          # the nine shared rules, bundled by `prepare` (Decision A-1)
+CONDUCTOR = BUNDLE / "conductor.md"        # the loop the M5 nudge reads a slice from (BUNDLE-relative)
 
 # The six steps, in order. "Where are we?" is just an index into this list, held
 # in the marker - NOT inferred from which docs are filled (those are full across
@@ -55,13 +58,103 @@ ENTRY = WF / "publish-entry.md"       # the model's drafted settled-prose that `
 STEPS = ["need", "design", "architecture", "implementation", "judgment", "shipping"]
 
 
-def artifact_path(step):
+# --- PROJECT path builders: each is a function of the resolved `root` ------------
+# (These WERE the WF / MARKER / CONTEXT / CHALLENGE / ENTRY constants + artifact_path.
+# D-2 turned every one into root -> Path, so a caller aims it at the project IT resolved
+# rather than at BUNDLE. The bodies are trivial on purpose - the intelligence is in who
+# passes which `root`, resolved by the walk-ups below.)
+def wf_dir(root):
+    """The runtime-state dir: <root>/.workflow (gitignored, ephemeral; `start` creates it)."""
+    return Path(root) / ".workflow"
+
+
+def marker_path(root):
+    """The one state file the whole system reads. This exact literal (`.workflow/marker.json`)
+    is repeated - DELIBERATELY, as the stat-before-import guard (D-9(ii)) - in statusline_wf.py
+    and nudge.py, which must test for a task WITHOUT importing this module. A test asserts all
+    three spellings agree (Architecture Section 2, proof 2), so the duplication cannot rot."""
+    return wf_dir(root) / "marker.json"
+
+
+def context_path(root):
+    """The bundle `prepare` hands the challenger."""
+    return wf_dir(root) / "context.md"
+
+
+def challenge_path(root):
+    """Where the challenger writes its verdicts back."""
+    return wf_dir(root) / "challenge.md"
+
+
+def entry_path(root):
+    """The model's drafted settled-prose that `publish` places. EVERY publishing step drafts
+    here (need/design/architecture/judgment), which is why the name is publish-, not overview-:
+    it served only Need -> OVERVIEW in M3, before the engine generalized."""
+    return wf_dir(root) / "publish-entry.md"
+
+
+def gitignore_path(root):
+    """D-10: the self-ignoring rule `start` authors, so `git add -A` in ANY repo never stages
+    task state - without needing a rule in the repo's own .gitignore."""
+    return wf_dir(root) / ".gitignore"
+
+
+def global_habits_path(root):
+    """The hand-filled global-habits slot (usually empty) - a WARM context input, not machine
+    output, so `reset` spares it (D-10)."""
+    return wf_dir(root) / "global-habits.md"
+
+
+def draft_path(root, step):
     """The file that IS this step's product - the draft under attack, hashed for freshness.
     Named `draft-<step>.md` (NOT `<step>.md`) on purpose: on a case-insensitive filesystem
     (Windows, default macOS) a bare `docs/architecture.md` collides with the real committed
     `docs/ARCHITECTURE.md` and would clobber it. The `draft-` prefix cannot collide with any
-    canonical doc name, so every review-style step's draft is safe (keeps proof #4 honest)."""
-    return ROOT / "docs" / ("draft-" + step + ".md")
+    canonical doc name, so every review-style step's draft is safe (keeps proof #4 honest).
+    D-10 moved these OUT of docs/ and INTO .workflow/, so a plain `git add -A` never stages an
+    in-flight draft (the whole dir is ignored); the file NAME is unchanged."""
+    return wf_dir(root) / ("draft-" + step + ".md")
+
+
+# --- root resolution (D-2a): pure, stdlib, no marker/receipt logic ---------------
+def _walk_up_for_marker(start):
+    """Nearest ancestor of `start` (inclusive) that holds .workflow/marker.json, else None.
+    This is how EVERY verb except `start` finds its project: an open task announces itself by
+    its marker, no matter which subdirectory the human ran the command from."""
+    start = Path(start).resolve()
+    for d in (start, *start.parents):
+        if (d / ".workflow" / "marker.json").exists():
+            return d
+    return None
+
+
+def _walk_up_for_git(start):
+    """Nearest ancestor of `start` (inclusive) that holds a .git ENTRY - a directory for a
+    normal repo, a FILE for a worktree or submodule - else None. This is how `start` ALONE
+    finds the project root: the human's settled rule is that his projects are git repos and
+    the repo root IS the project root (OPERATOR.md). `.exists()` (not `.is_dir()`) is what
+    makes the file-form work, so a worktree is rooted correctly too."""
+    start = Path(start).resolve()
+    for d in (start, *start.parents):
+        if (d / ".git").exists():
+            return d
+    return None
+
+
+def _project_root(root):
+    """Resolve a reader's root: an explicit `root` always wins (a hook is HANDED its root by
+    the platform, and every in-process caller passes the one it resolved); ONLY when it is
+    None do we fall back to the marker walk-up from CWD - the single unambiguous default, used
+    solely by a human or model typing a verb inside an open task. Returns Path or None.
+
+    An explicit `root` is wrapped in Path but NOT normalized here: the CLI never needs it (its
+    root comes from the walk-ups, which already .resolve()). Block 2's hooks ingest a root as a
+    raw platform STRING (stdin `workspace.project_dir` / $CLAUDE_PROJECT_DIR, forward- vs
+    back-slashed) and add that normalization (the D-2a `_resolve_root` primitive) at the point
+    it is actually needed - so it is not built here, where nothing yet consumes it."""
+    if root is not None:
+        return Path(root)
+    return _walk_up_for_marker(Path.cwd())
 
 
 # ---------------------------------------------------------------------------
@@ -232,10 +325,18 @@ def _read_if_present(path):
     return text if text.strip() else ""
 
 
-def load_marker():
-    """Return the marker dict, or None if no task is open (machinery inert here)."""
+def load_marker(root=None):
+    """Return the marker dict, or None if no task is open here (machinery inert).
+
+    `root=None` walks up from CWD to find an open task - the CLI convenience default. Every
+    hook and every test pass an EXPLICIT root, because they are handed where the project is
+    and must not re-guess it from a process cwd (that re-guess is exactly the D-2 defect: a
+    hook launched in ~/.claude would 'find' the wrong project, or none)."""
+    root = _project_root(root)
+    if root is None:
+        return None
     try:
-        return json.loads(MARKER.read_text(encoding="utf-8"))
+        return json.loads(marker_path(root).read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
 
@@ -268,14 +369,33 @@ def _atomic_write_text(path, text):
         raise
 
 
-def _save_marker(marker):
-    """Persist the marker atomically (see _atomic_write_text)."""
-    _atomic_write_text(MARKER, json.dumps(marker, indent=2))
+def _save_marker(marker, root=None):
+    """Persist the marker atomically (see _atomic_write_text). Returns 0 on success, or a
+    non-zero _fail on an OSError - D-9(iii): the write guard lives HERE so every caller
+    (start/record/advance) is covered in one place, and a filesystem failure becomes a clean
+    one-line message instead of a raw traceback (which the platform MANGLES under a hook).
+    Callers propagate the return, so a failed save never prints a false 'succeeded'."""
+    root = _project_root(root)
+    if root is None:
+        # Match load_marker/receipt_state: with no task at or above CWD there is nowhere to write,
+        # so degrade to a clean _fail rather than a TypeError inside marker_path(None) - the raw
+        # traceback D-9(iii) exists to keep out of a hook. (Unreached in Block 1 - every verb passes
+        # an explicit root - but this guards a future/hook caller that trusts the =None default.)
+        return _fail("no task open here - cannot save the marker (run `start` first).")
+    try:
+        _atomic_write_text(marker_path(root), json.dumps(marker, indent=2))
+    except OSError as exc:
+        return _fail("could not write the marker at {} ({}).".format(marker_path(root), exc))
+    return 0
 
 
-def receipt_state(step, marker=None):
+def receipt_state(step, root=None, marker=None):
     """THE shared truth function - imported by the status line and the hooks (M5) so
     the fresh/stale/missing rule lives in exactly one place and can never drift.
+
+    `root` (added in M5) locates the draft whose bytes are hashed: the status line and hooks
+    pass the project root the platform handed them; a CLI/library caller may omit it to walk
+    up from CWD. `marker` may be passed to avoid a re-load (e.g. cmd_status loops over steps).
 
     Returns one of:
       "missing" - no receipt for this step (challenge never recorded, or it failed
@@ -288,9 +408,11 @@ def receipt_state(step, marker=None):
                   recorded. Only this counts as "the challenge really ran against what
                   is on disk right now."
     """
+    root = _project_root(root)
     if marker is None:
-        marker = load_marker()
-    if not marker:
+        marker = load_marker(root)
+    # No marker, or no root to locate the draft against -> honest "not done", fail-closed.
+    if not marker or root is None:
         return "missing"
     receipt = marker.get("receipts", {}).get(step)
     if not receipt:
@@ -300,7 +422,7 @@ def receipt_state(step, marker=None):
         # that never had a real challenge. The honest state is "missing" (no challenge
         # happened), not "stale"; status shows "missing (overridden)".
         return "missing"
-    current = sha256_bytes(artifact_path(step))
+    current = sha256_bytes(draft_path(root, step))
     if current is None:
         # Had a receipt, but the artifact is gone/unreadable now -> not trustworthy.
         return "stale"
@@ -315,35 +437,50 @@ def _fail(msg):
     return 1
 
 
-def _resolve_sources(tokens, step):
+def _print_root(root):
+    """Announce which project root a verb resolved to. STDERR, not stdout (human ruling,
+    2026-07-16): it stays visible in a terminal AND in a Bash tool's error stream - which is
+    where the guard earns its keep, catching a Claude-typed stray `cd` that silently re-rooted
+    a verb - while keeping the stdout the tests (and any caller) parse completely untouched."""
+    sys.stderr.write("workflow: root {}\n".format(root))
+
+
+def _resolve_sources(tokens, step, root):
     """Turn a recipe's source tokens into ordered (label, path) pairs. Kept tiny and
     data-driven so ADDING A STEP is a recipe row, never new code here (proof #4,
     replication-ready). An unknown token is a recipe bug, raised loudly rather than
-    silently dropping context the challenger needs (a unit test asserts the raise)."""
+    silently dropping context the challenger needs (a unit test asserts the raise).
+    Every path is built from the passed-in `root` (M5/D-2), never a module constant.
+
+    `root` is REQUIRED here (no `=None` default), unlike the public readers load_marker/
+    receipt_state: this is a prepare-internal helper that builds paths DIRECTLY and has no
+    walk-up fallback, so a defaulted None would crash in draft_path(None, ...). Required makes
+    the one caller (cmd_prepare, which always holds a resolved root) pass it, and turns any
+    future misuse into an obvious missing-argument error rather than a latent crash."""
     pairs = []
     for tok in tokens:
         if tok == "artifact":
-            pairs.append(("the proposal under attack (step: {})".format(step), artifact_path(step)))
+            pairs.append(("the proposal under attack (step: {})".format(step), draft_path(root, step)))
         elif tok == "prior_settled":
             # every step strictly BEFORE this one, in order (empty for the first step)
             for prior in STEPS[:STEPS.index(step)]:
-                pairs.append(("settled record: {}".format(prior), artifact_path(prior)))
+                pairs.append(("settled record: {}".format(prior), draft_path(root, prior)))
         elif tok == "operator":
-            pairs.append(("operator context (how this developer actually works)", ROOT / "docs" / "OPERATOR.md"))
+            pairs.append(("operator context (how this developer actually works)", Path(root) / "docs" / "OPERATOR.md"))
         elif tok == "global_habits":
-            pairs.append(("global-habits slot (hand-filled; usually empty)", WF / "global-habits.md"))
+            pairs.append(("global-habits slot (hand-filled; usually empty)", global_habits_path(root)))
         else:
             raise KeyError("unknown recipe source token: {!r}".format(tok))
     return pairs
 
 
-def _append_sources(out, tokens, step):
+def _append_sources(out, tokens, step, root):
     """Append each present source as a labelled section to the bundle list `out`.
     Returns True if it appended at least one section. Shared by the COLD and WARM
     assembly so the two are IDENTICAL by construction (a formatting change can't drift
     between them)."""
     added = False
-    for label, path in _resolve_sources(tokens, step):
+    for label, path in _resolve_sources(tokens, step, root):
         text = _read_if_present(path)
         if text:
             added = True
@@ -355,13 +492,36 @@ def _append_sources(out, tokens, step):
 # ---------------------------------------------------------------------------
 # The verbs.
 # ---------------------------------------------------------------------------
+def _write_gitignore(root):
+    """D-10: author .workflow/.gitignore = `*` then `!global-habits.md`. The `*` ignores ALL
+    task state (marker, drafts, context, challenge, entry, nudge-state) AND this .gitignore
+    itself; the single re-include exempts the hand-authored global-habits.md. There is NO
+    `!.gitignore` line ON PURPOSE: adding it would make `start` author a git-TRACKED file in
+    every repo it runs in (D-10 tested this twice), which is exactly what we are avoiding."""
+    _atomic_write_text(gitignore_path(root), "*\n!global-habits.md\n")
+
+
 def cmd_start(args):
     """Human-owned bootstrap. Starting a task is a deliberate act; this is the only
-    way the machinery comes alive. Refuses if a task is already open rather than
-    silently clobbering an in-progress one (that clobber would be exactly the kind of
-    invisible failure the whole design exists to prevent)."""
-    if MARKER.exists():
-        return _fail("a task is already open (run `reset` first). Refusing to clobber it.")
+    way the machinery comes alive.
+
+    M5/D-2a: `start` is the ONE verb rooted by the GIT walk-up - no marker exists yet, so it
+    cannot use the marker walk-up every other verb uses. The human's settled rule is that the
+    repo root IS the project root (OPERATOR.md). It refuses if a task is already open at or
+    above CWD rather than silently clobbering an in-progress one (that clobber would be exactly
+    the kind of invisible failure the whole design exists to prevent), and it authors the
+    self-ignoring .workflow/.gitignore (D-10) so git hygiene holds in any repo."""
+    root = _walk_up_for_git(Path.cwd())
+    if root is None:
+        return _fail("not inside a git repository (no .git at or above {}). `start` roots the "
+                     "task at the repo root, so run it from within your project.".format(Path.cwd()))
+    _print_root(root)
+    # Refuse if any ancestor already holds an open task - the marker walk-up, used here only to
+    # forbid a nested/duplicate task, never to root this one.
+    open_at = _walk_up_for_marker(Path.cwd())
+    if open_at is not None:
+        return _fail("a task is already open at {} (run `reset` there first). Refusing to "
+                     "clobber it.".format(open_at))
     marker = {
         "task_id": secrets.token_hex(4),   # short unique id for this task
         "task_title": args.title,
@@ -369,7 +529,15 @@ def cmd_start(args):
         "receipts": {},                    # filled one step at a time by `record`
         "pending": None,                   # the in-flight challenge (set by `prepare`)
     }
-    _save_marker(marker)
+    # Author the ignore rule BEFORE the marker: if this fails we have written no marker, so
+    # "no task open" still holds everywhere and a re-run of `start` heals it cleanly.
+    try:
+        _write_gitignore(root)
+    except OSError as exc:
+        return _fail("could not author {} ({}); nothing started.".format(gitignore_path(root), exc))
+    rc = _save_marker(marker, root)
+    if rc:
+        return rc
     print("started task '{}' [{}] at step: {}".format(
         marker["task_title"], marker["task_id"], marker["current_step"]))
     return 0
@@ -388,7 +556,11 @@ def cmd_prepare(args):
     read the file too - the accepted permanent ceiling), but it DOES catch an honest
     mistake: a challenge run against the wrong or truncated bundle echoes the wrong
     token and gets rejected at `record`."""
-    marker = load_marker()
+    root = _walk_up_for_marker(Path.cwd())
+    if root is None:
+        return _fail("no task open at or above {} - run `start` first.".format(Path.cwd()))
+    _print_root(root)
+    marker = load_marker(root)
     if not marker:
         return _fail("no task open (run `start` first).")
     step = args.step
@@ -409,9 +581,9 @@ def cmd_prepare(args):
 
     # Fail-closed on a missing/empty proposal: challenging nothing is meaningless, and
     # (with the snapshot below) would otherwise let a later-written draft earn a receipt.
-    if not _read_if_present(artifact_path(step)):
+    if not _read_if_present(draft_path(root, step)):
         return _fail("no proposal to challenge at {} - draft the '{}' step first. "
-                     "Nothing prepared.".format(artifact_path(step), step))
+                     "Nothing prepared.".format(draft_path(root, step), step))
 
     canary = "WF-CANARY-" + secrets.token_hex(8)   # fresh every prepare
 
@@ -433,17 +605,17 @@ def cmd_prepare(args):
     # echoing it proves the cold section was read THROUGH to the end (a truncated read
     # loses it - the real honest-mistake failure mode).
     out.append("\n===== COLD (read + verdict + canary FIRST) =====\n")
-    _append_sources(out, recipe["cold_sources"], step)
+    _append_sources(out, recipe["cold_sources"], step, root)
     out.append("\nCANARY (echo this token verbatim in your COLD verdict): {}\n".format(canary))
 
     # WARM: operator + global habits. Delivered in the same bundle (alpha-1) but ordered
     # after the cold canary and labelled "read only after the cold verdict".
     out.append("\n===== WARM (read only AFTER writing the cold verdict) =====\n")
-    if not _append_sources(out, recipe["warm_sources"], step):
+    if not _append_sources(out, recipe["warm_sources"], step, root):
         out.append("\n(no warm context on file for this task)\n")
 
     bundle = "".join(out)
-    WF.mkdir(exist_ok=True)
+    wf_dir(root).mkdir(exist_ok=True)
 
     # Clear the PREVIOUS round's challenger result before this round's challenger runs (live
     # smoke-test finding L2 - the exact mirror of CB1's leftover-ENTRY bug, one file over).
@@ -461,17 +633,23 @@ def cmd_prepare(args):
     # above on purpose: a REFUSED prepare must not have the side effect of destroying the
     # previous round's result. A benign "already gone" is the normal case.
     try:
-        CHALLENGE.unlink()
+        challenge_path(root).unlink()
     except FileNotFoundError:
         pass
     except OSError as exc:
         return _fail("prepared nothing: could not clear the previous challenger result ({}) - the "
                      "next challenger would read it as context and lose its independence. Close "
-                     "whatever holds {} and re-run prepare.".format(exc, CHALLENGE))
+                     "whatever holds {} and re-run prepare.".format(exc, challenge_path(root)))
 
     # Write bytes so the file matches the string we hash below exactly (no newline
-    # translation), consistent with _atomic_write_text.
-    CONTEXT.write_bytes(bundle.encode("utf-8"))
+    # translation), consistent with _atomic_write_text. D-9(iii): guard the write so a locked
+    # or unwritable .workflow yields a clean _fail, not a traceback the platform mangles under
+    # a hook - and, because it sits before the pending is saved, a failed write prepares nothing.
+    try:
+        context_path(root).write_bytes(bundle.encode("utf-8"))
+    except OSError as exc:
+        return _fail("could not write the challenge bundle to {} ({}). Nothing prepared."
+                     .format(context_path(root), exc))
 
     marker["pending"] = {
         "step": step,
@@ -481,10 +659,12 @@ def cmd_prepare(args):
         # the live artifact no longer matches this - closing the window where the draft
         # is edited AFTER the challenge but BEFORE record, which would otherwise mint a
         # "fresh" receipt for bytes nobody challenged.
-        "artifact_hash": sha256_bytes(artifact_path(step)),
+        "artifact_hash": sha256_bytes(draft_path(root, step)),
     }
-    _save_marker(marker)
-    print("prepared challenge for '{}': bundle -> {} (rulebook + canary planted)".format(step, CONTEXT))
+    rc = _save_marker(marker, root)
+    if rc:
+        return rc
+    print("prepared challenge for '{}': bundle -> {} (rulebook + canary planted)".format(step, context_path(root)))
     return 0
 
 
@@ -495,26 +675,32 @@ def cmd_record(args):
     an artifact that changed between prepare and record writes NO receipt and returns
     non-zero. This is load-bearing - the whole honest floor collapses if there is any
     path that writes a partial 'green'."""
-    marker = load_marker()
+    root = _walk_up_for_marker(Path.cwd())
+    if root is None:
+        return _fail("no task open at or above {} - run `start` first.".format(Path.cwd()))
+    _print_root(root)
+    marker = load_marker(root)
     if not marker:
         return _fail("no task open (run `start` first).")
     step = args.step
     pending = marker.get("pending")
     if not pending or pending.get("step") != step:
         return _fail("no challenge is pending for '{}' (did you run `prepare`?).".format(step))
-    if not CHALLENGE.exists():
-        return _fail("no challenger result at {} - challenge did not run. No receipt written.".format(CHALLENGE))
+    if not challenge_path(root).exists():
+        return _fail("no challenger result at {} - challenge did not run. No receipt written."
+                     .format(challenge_path(root)))
 
-    result_text = CHALLENGE.read_text(encoding="utf-8", errors="replace")
+    result_text = challenge_path(root).read_text(encoding="utf-8", errors="replace")
     if pending["canary"] not in result_text:
         # The result does not echo this bundle's token -> it did not consume the right
         # context (wrong/stale/truncated bundle, or no real challenge). Reject.
         return _fail("challenger result did not echo the current canary - wrong/stale context. "
                      "No receipt written.")
 
-    artifact_hash = sha256_bytes(artifact_path(step))
+    artifact_hash = sha256_bytes(draft_path(root, step))
     if artifact_hash is None:
-        return _fail("artifact for '{}' is unreadable ({}). No receipt written.".format(step, artifact_path(step)))
+        return _fail("artifact for '{}' is unreadable ({}). No receipt written."
+                     .format(step, draft_path(root, step)))
     if artifact_hash != pending.get("artifact_hash"):
         # The draft changed between `prepare` and `record`: the challenge ran against
         # different bytes than are on disk now. Refuse rather than certify the wrong ones.
@@ -533,13 +719,13 @@ def cmd_record(args):
     # The inherent residual (a fresh-but-divergent entry - a post-settle summary that cannot be
     # hash-compared to the draft) is model-authored + human-reviewed and is documented (RISKS #13).
     try:
-        ENTRY.unlink()
+        entry_path(root).unlink()
     except FileNotFoundError:
         pass
     except OSError as exc:
         return _fail("recorded nothing: could not clear a leftover drafted entry ({}) - a stale "
                      "entry could otherwise publish under a fresh receipt. Close whatever holds {} "
-                     "and re-run record.".format(exc, ENTRY))
+                     "and re-run record.".format(exc, entry_path(root)))
 
     marker.setdefault("receipts", {})[step] = {
         "challenge_ran": True,           # self-reported: "the model reports it ran" - never "verified"
@@ -548,7 +734,9 @@ def cmd_record(args):
         "canary": pending["canary"],
     }
     marker["pending"] = None             # consume the pending challenge
-    _save_marker(marker)
+    rc = _save_marker(marker, root)
+    if rc:
+        return rc
     print("recorded receipt for '{}' (challenge_ran, artifact hashed).".format(step))
     return 0
 
@@ -562,7 +750,11 @@ def cmd_advance(args):
     records that the human overrode, so the bypass is on the record, never silent. This
     reconciles "advance is gated" with "warn, never block - the human keeps the wheel",
     and gives a lighter path when a benign post-settle edit flips the hash."""
-    marker = load_marker()
+    root = _walk_up_for_marker(Path.cwd())
+    if root is None:
+        return _fail("no task open at or above {} - run `start` first.".format(Path.cwd()))
+    _print_root(root)
+    marker = load_marker(root)
     if not marker:
         return _fail("no task open (run `start` first).")
     cur = marker["current_step"]
@@ -570,7 +762,7 @@ def cmd_advance(args):
     if idx == len(STEPS) - 1:
         return _fail("already at the last step ('{}'); nothing to advance to.".format(cur))
 
-    state = receipt_state(cur, marker)
+    state = receipt_state(cur, root=root, marker=marker)
     overriding = state != "fresh" and args.force   # computed once so the record + the message agree
     if state != "fresh" and not args.force:
         return _fail("cannot advance: step '{}' is '{}', not 'fresh'. Run the challenge, or "
@@ -584,7 +776,9 @@ def cmd_advance(args):
 
     marker["current_step"] = STEPS[idx + 1]
     marker["pending"] = None  # a new step starts with no challenge pending
-    _save_marker(marker)
+    rc = _save_marker(marker, root)
+    if rc:
+        return rc
     print("advanced: {} -> {}{}".format(cur, marker["current_step"], " (HUMAN OVERRIDE)" if overriding else ""))
     return 0
 
@@ -796,7 +990,11 @@ def cmd_publish(args):
       * 'section' -> scope = a --section slug, placement = append_section (one
                      section per component; --new/--update intent guards a mistargeted
                      write; ARCHITECTURE)."""
-    marker = load_marker()
+    root = _walk_up_for_marker(Path.cwd())
+    if root is None:
+        return _fail("no task open at or above {} - run `start` first.".format(Path.cwd()))
+    _print_root(root)
+    marker = load_marker(root)
     if not marker:
         return _fail("no task open (run `start` first).")
     step = args.step
@@ -816,19 +1014,19 @@ def cmd_publish(args):
     if step != marker.get("current_step"):
         return _fail("current step is '{}', not '{}' - refusing to publish a non-current step."
                      .format(marker.get("current_step"), step))
-    state = receipt_state(step, marker)
+    state = receipt_state(step, root=root, marker=marker)
     if state != "fresh":
         return _fail("step '{}' has no fresh receipt (state: {}) - run the challenge and `record` "
                      "before publishing.".format(step, state))
 
     # 1) The drafted entry: exists, non-empty, and carries no injected marker line.
     try:
-        entry = ENTRY.read_text(encoding="utf-8").strip() if ENTRY.exists() else ""
+        entry = entry_path(root).read_text(encoding="utf-8").strip() if entry_path(root).exists() else ""
     except (OSError, UnicodeDecodeError):
-        return _fail("drafted entry at {} is unreadable. Nothing published.".format(ENTRY))
+        return _fail("drafted entry at {} is unreadable. Nothing published.".format(entry_path(root)))
     if not entry:
         return _fail("no drafted entry at {} (write the settled prose there first). "
-                     "Nothing published.".format(ENTRY))
+                     "Nothing published.".format(entry_path(root)))
     entry = entry.replace("\r\n", "\n")   # LF space; the doc's own newline is re-applied on write
     if _entry_has_marker_line(entry):
         return _fail("the drafted entry contains a standalone WF: marker line - refusing "
@@ -856,7 +1054,7 @@ def cmd_publish(args):
     # 3) The target doc must already exist - place INTO a real doc, never create one.
     #    Raw bytes preserve newlines on any Python 3; work in LF space and restore the
     #    doc's newline style on write (so a Windows publish can't flip the whole file).
-    target = ROOT / pub["doc_target"]
+    target = Path(root) / pub["doc_target"]
     try:
         raw = target.read_bytes().decode("utf-8")
     except FileNotFoundError:
@@ -896,11 +1094,11 @@ def cmd_publish(args):
     #    wrong content (convergence round-2 BLOCKING #1; the earlier "idempotent" reasoning held only
     #    for the SAME scope). Consuming first also makes every publish require a freshly-drafted entry.
     try:
-        ENTRY.unlink()
+        entry_path(root).unlink()
     except OSError as exc:
         return _fail("cannot consume the drafted entry ({}) - refusing to publish, because a surviving "
                      "entry could be silently re-used for another scope. Close whatever holds {} and "
-                     "retry.".format(exc, ENTRY))
+                     "retry.".format(exc, entry_path(root)))
 
     # 7) Write atomically; a locked/failed target yields a clean _fail, not a traceback. (The entry is
     #    already consumed, so a failed write means redraft-and-retry - the safe, fail-closed trade.)
@@ -915,7 +1113,12 @@ def cmd_publish(args):
 def cmd_status(args):
     """Human-readable readout of the marker. (The status line - M5 - renders its own
     compact version by importing receipt_state; this verb is for the terminal.)"""
-    marker = load_marker()
+    root = _walk_up_for_marker(Path.cwd())
+    if root is None:
+        print("no task open (machinery inert here).")
+        return 0
+    _print_root(root)
+    marker = load_marker(root)
     if not marker:
         print("no task open (machinery inert here).")
         return 0
@@ -925,7 +1128,7 @@ def cmd_status(args):
     for i, step in enumerate(STEPS):
         if i > cur_idx:
             break
-        state = receipt_state(step, marker)
+        state = receipt_state(step, root=root, marker=marker)
         rec = marker.get("receipts", {}).get(step, {})
         tag = "  <- current" if step == marker["current_step"] else ""
         over = " (overridden)" if rec.get("override") else ""
@@ -937,13 +1140,27 @@ def cmd_status(args):
 
 def cmd_reset(args):
     """End the task: remove all runtime state. The committed docs remain; only this
-    task's live marker/bundle/challenge/entry go away, leaving the machinery inert.
+    task's live machine output goes away, leaving the machinery inert.
+
+    D-10 widened WHAT is cleared: the drafts now live in .workflow/ (so each draft-<step>.md
+    is task output that dies with reset), and the M5 nudge's quiet-hash (nudge-state.json) dies
+    too. Two files are SPARED on purpose: global-habits.md (a hand-authored WARM input, not
+    machine output) and .gitignore (`start` owns it; it must persist so .workflow/ stays
+    self-ignoring even after a reset). Still a FIXED list, not a glob - the single-file
+    quiet-hash is what keeps it enumerable.
 
     A file that is already gone is the intended, benign case; a file that EXISTS but
     cannot be deleted (e.g. locked by an editor or a OneDrive sync) is a real failure
     and is reported - never swallowed under a false 'cleared'."""
+    root = _walk_up_for_marker(Path.cwd())
+    if root is None:
+        return _fail("no task open at or above {} - nothing to reset.".format(Path.cwd()))
+    _print_root(root)
+    targets = [marker_path(root), context_path(root), challenge_path(root), entry_path(root),
+               wf_dir(root) / "nudge-state.json"]
+    targets += [draft_path(root, step) for step in STEPS]   # D-10: drafts are task output now
     failed = []
-    for p in (MARKER, CONTEXT, CHALLENGE, ENTRY):
+    for p in targets:
         try:
             p.unlink()
         except FileNotFoundError:

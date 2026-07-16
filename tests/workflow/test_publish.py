@@ -30,10 +30,12 @@ TMP = Path(tempfile.mkdtemp(prefix="wf_pub_"))
 shutil.copy(SRC / "workflow.py", TMP / "workflow.py")
 shutil.copy(SRC / "rulebook.md", TMP / "rulebook.md")
 (TMP / "docs").mkdir()
+(TMP / ".workflow").mkdir()   # D-10: drafts + task state live here now
+(TMP / ".git").mkdir()        # D-2a: `start` roots the task at the nearest .git ancestor
 
 WF = TMP / ".workflow"
 ENTRY = WF / "publish-entry.md"
-NEED = TMP / "docs" / "draft-need.md"
+NEED = WF / "draft-need.md"                       # D-10: draft lives in .workflow/ now
 OVERVIEW = TMP / "docs" / "OVERVIEW.md"
 ANCHOR = "<!-- WF:anchor:current-status -->"      # the seeded per-location anchor publish targets
 
@@ -46,8 +48,10 @@ def check(name, cond):
 
 
 def run(*args):
+    # cwd=TMP so the subprocess roots at THIS test's project (walk-up from cwd), never the real
+    # repo above it - the D-3/D-10 guard (Architecture Section 2).
     p = subprocess.run([sys.executable, str(TMP / "workflow.py"), *args],
-                       capture_output=True, text=True)
+                       capture_output=True, text=True, cwd=str(TMP))
     return p.returncode, p.stdout, p.stderr
 
 

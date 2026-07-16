@@ -27,9 +27,22 @@ TMP = Path(tempfile.mkdtemp(prefix="wf_modes_"))
 shutil.copy(SRC / "workflow.py", TMP / "workflow.py")
 shutil.copy(SRC / "rulebook.md", TMP / "rulebook.md")
 (TMP / "docs").mkdir()
+(TMP / ".workflow").mkdir()   # D-10: drafts + task state live here now
+(TMP / ".git").mkdir()        # D-2a: `start` roots the task at the nearest .git ancestor
 
 sys.path.insert(0, str(TMP))
-import workflow as wf  # noqa: E402  (import after copy: ROOT resolves to TMP)
+import workflow as wf  # noqa: E402  (import after copy so `import workflow` finds the copy)
+
+# Aim in-process readers at THIS test's project root (root=TMP), as the M5 status line and nudge
+# pass the platform-handed root - never leaning on process cwd (the D-3 catastrophe the subprocess
+# `cwd=` guards). Qualified `wf.*` resolves on the module, never to these local wrappers, so there
+# is no recursion to guard against.
+def load_marker():
+    return wf.load_marker(root=TMP)
+
+
+def receipt_state(step):
+    return wf.receipt_state(step, root=TMP)
 
 checks = []
 
@@ -185,8 +198,10 @@ ENTRY = WFDIR / "publish-entry.md"
 
 
 def run(*args):
+    # cwd=TMP so the subprocess roots at THIS test's project (walk-up from cwd), never the real
+    # repo above it - the D-3/D-10 guard (Architecture Section 2).
     p = subprocess.run([sys.executable, str(TMP / "workflow.py"), *args],
-                       capture_output=True, text=True)
+                       capture_output=True, text=True, cwd=str(TMP))
     return p.returncode, (p.stdout + p.stderr).strip()
 
 
@@ -196,7 +211,7 @@ def entry(text):
 
 
 def draft(step, text):
-    (TMP / "docs" / ("draft-" + step + ".md")).write_text(text, encoding="utf-8")
+    (WFDIR / ("draft-" + step + ".md")).write_text(text, encoding="utf-8")   # D-10: drafts in .workflow/
 
 
 def settle(step):
@@ -297,7 +312,7 @@ check("B8b section publish preserves CRLF line endings (no bare LF introduced)",
 # specifically (the wrong-current-step message also contains the word 'implementation').
 rc, out = run("advance")
 check("B9 plain advance off architecture reaches implementation (receipt survived the publishes)",
-      rc == 0 and wf.load_marker()["current_step"] == "implementation")
+      rc == 0 and load_marker()["current_step"] == "implementation")
 rc, out = run("prepare", "implementation")
 check("B10 prepare implementation refuses with 'no recipe' (not a wrong-step message)",
       rc != 0 and "no recipe" in out.lower())
@@ -359,7 +374,7 @@ check("D0 design publishes to DECISIONS under its own anchor (log, distinct targ
       and dec.index("DESIGN settled for the walk") > dec.index("<!-- WF:anchor:decisions-log -->"))
 rc, out = run("advance")                            # design -> architecture
 check("D0b advance opens off design on its fresh receipt (design -> architecture)",
-      rc == 0 and wf.load_marker()["current_step"] == "architecture")
+      rc == 0 and load_marker()["current_step"] == "architecture")
 
 # March through architecture/implementation - section mode is proven in Part B, so force past.
 run("advance", "--force")                          # architecture -> implementation
@@ -379,14 +394,14 @@ check("D2 need and judgment BOTH live under one OVERVIEW anchor, judgment newest
       and doc.index("JUDGMENT verdict for the walk") < doc.index("NEED settled for the walk"))
 rc, out = run("advance")                            # judgment -> shipping
 check("D2b advance opens off judgment on its fresh receipt (judgment -> shipping)",
-      rc == 0 and wf.load_marker()["current_step"] == "shipping")
+      rc == 0 and load_marker()["current_step"] == "shipping")
 
 # Shipping: terminal. It settles via record (earns a receipt) but publishes NOTHING and has
 # nowhere to advance to (proof #4 amendment: Shipping proves through `record` only).
 draft("shipping", "# shipping\nreal-world readiness under attack.\n")
 settle("shipping")
 check("D3 shipping earns a fresh receipt via record (the terminal step's proof)",
-      wf.receipt_state("shipping") == "fresh")
+      receipt_state("shipping") == "fresh")
 rc, out = run("advance")
 check("D4 shipping is terminal - nothing to advance to", rc != 0 and "last step" in out.lower())
 

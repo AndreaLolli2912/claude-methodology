@@ -19,12 +19,26 @@ TMP = Path(tempfile.mkdtemp(prefix="wf_flow_"))
 shutil.copy(SRC / "workflow.py", TMP / "workflow.py")
 shutil.copy(SRC / "rulebook.md", TMP / "rulebook.md")
 (TMP / "docs").mkdir()
+(TMP / ".workflow").mkdir()   # D-10: drafts + task state live here now; create before any draft write
+(TMP / ".git").mkdir()        # D-2a: `start` roots the task at the nearest .git ancestor - give it one
 
 sys.path.insert(0, str(TMP))
 import workflow  # noqa: E402
 
+# Aim every in-process reader at THIS test's project root (root=TMP), as the M5 status line and
+# nudge pass the platform-handed root - never leaning on process cwd (the D-3 catastrophe the
+# subprocess `cwd=` guards). Qualified `workflow.*` resolves on the module, never to these local
+# wrappers, so there is no recursion to guard against.
+def load_marker():
+    return workflow.load_marker(root=TMP)
+
+
+def receipt_state(step):
+    return workflow.receipt_state(step, root=TMP)
+
+
 WF = TMP / ".workflow"
-NEED = TMP / "docs" / "draft-need.md"
+NEED = WF / "draft-need.md"                    # D-10: draft lives in .workflow/ now
 OVERVIEW = TMP / "docs" / "OVERVIEW.md"
 CONTEXT = WF / "context.md"
 CHALLENGE = WF / "challenge.md"
@@ -39,8 +53,10 @@ def check(name, cond):
 
 
 def run(*args):
+    # cwd=TMP so the subprocess roots at THIS test's project (walk-up from cwd), never the real
+    # repo above it - the D-3/D-10 guard (Architecture Section 2).
     p = subprocess.run([sys.executable, str(TMP / "workflow.py"), *args],
-                       capture_output=True, text=True)
+                       capture_output=True, text=True, cwd=str(TMP))
     return p.returncode, p.stdout, p.stderr
 
 
@@ -61,14 +77,14 @@ ANCHOR = "<!-- WF:anchor:current-status -->"
 
 # 1) start -> 2) draft -> 3) prepare -> 4) challenger writes result -> 5) record
 run("start", "End-to-end need")
-task_id = workflow.load_marker()["task_id"]                  # the log-block scope is this task's id
+task_id = load_marker()["task_id"]                  # the log-block scope is this task's id
 need_start = "<!-- WF:need:{}:start -->".format(task_id)     # M4 both-ends-identity marker
 NEED.write_text("# Need\nThe toy need, drafted for the flow test.\n", encoding="utf-8")
 run("prepare", "need")
 CHALLENGE.write_text("## COLD verdict\nlooks ok. canary: {}\n\n## WARM verdict\nok\n".format(canary()),
                      encoding="utf-8")
 rc, _, _ = run("record", "need")
-check("1 record writes a fresh receipt after a real prepare->challenge", rc == 0 and workflow.receipt_state("need") == "fresh")
+check("1 record writes a fresh receipt after a real prepare->challenge", rc == 0 and receipt_state("need") == "fresh")
 
 # 6) publish the settled prose into OVERVIEW
 ENTRY.write_text("**2026-07-14** - Need settled: the machinery must prove the pattern end to end.\n",
@@ -82,11 +98,11 @@ check("2 publish auto-docs the settled Need into OVERVIEW under the seeded ancho
 
 # 7) advance - the gate opens because the receipt is fresh
 rc, _, _ = run("advance")
-check("3 advance opens on the fresh receipt (need -> design)", rc == 0 and workflow.load_marker()["current_step"] == "design")
+check("3 advance opens on the fresh receipt (need -> design)", rc == 0 and load_marker()["current_step"] == "design")
 
 # The whole chain settled one step end to end with both outputs (receipt + auto-doc).
 check("4 both outputs present: fresh receipt recorded AND the OVERVIEW block written",
-      "need" in workflow.load_marker().get("receipts", {})
+      "need" in load_marker().get("receipts", {})
       and OVERVIEW.read_text(encoding="utf-8").count(need_start) == 1)
 
 shutil.rmtree(TMP, ignore_errors=True)
