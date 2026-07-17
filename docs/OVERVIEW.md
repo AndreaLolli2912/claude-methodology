@@ -37,6 +37,101 @@ every machine in sync through git.
 
 <!-- WF:anchor:current-status -->
 
+<!-- WF:judgment:b9a87ab6:start -->
+### 2026-07-17 — M6 Judgment: transport & packaging — GO
+
+The built directory-whitelist transport (Implementation, task `b9a87ab6`) **meets the Need**
+(draft-need §8). Verdict: **GO**, settled with the operator after one challenge round.
+
+**Proof bar — the testable items all pass** (full suite 250/250; new `test_sync_bundle.py`, 45 checks):
+directory deploy with no `sync.py` edit (1); fail-loud with teeth — a stray HALTS, a missing named entry
+REPORTS + exits non-zero, resolved roots + a shipped/skipped/reported summary print (2); no junk either
+direction (3); capture + status work under the new model (4); version recorded, 0.4.0 + CHANGELOG (6).
+Self-hosting (8) is proven by this in-repo dogfood — honestly a **five-formally-challenged-steps + one
+ad-hoc fidelity review** pass (Implementation earns no formal challenge by design), not six-of-six.
+
+**Two live items sequenced, not gaps.** Proof-7's live half (a fresh session actually *proposing* the
+workflow on a qualifying task) is **accepted now on the testable half** — the start-trigger + `workflow.py
+start` text is in the shipped core — and **observed after deploy**, since it is only observable once the
+core is installed (i.e. downstream of proof-9). Proof-9 (live install clean) is a **Shipping** act (needs
+the operator's approval; installing mid-milestone is barred by RISKS #19).
+
+**Honesty caveats (challenger, folded).** The halt / report / orphan paths are proven in temp dirs; the
+one live observation was a happy-path read-only `status` run. The non-zero exit's "teeth" also surface as
+printed warnings + the halt (not only `$?`) — which matters, since these commands are run by Claude as
+much as by the operator. The P2 deploy-doc fix is verified: `ARCHITECTURE` Components + Contracts
+rewritten; `## Stack` checked (no MANIFEST reference — nothing to fix); `README` + root `CLAUDE.md` +
+`RISKS` #1/#8 + `CONTRIBUTING` updated.
+
+**Decisions settled with the operator.**
+- **C3 — capture semantics.** Design's **F2 supersedes** the Need's looser "pull back the bundle-owned
+  paths": capture walks the **repo's ship set**, so a file deleted from the repo but still live is not
+  resurrected — it is reported as an orphan (exit 0). The code already matches; no change.
+- **W1 — keep install's per-file `*.bak` backup.** Kept: cheap; restores the exact prior live bytes after
+  a bad deploy (faster than a git-checkout + reinstall); consistent with the Need already ignoring `*.bak`
+  on capture. Revisit at the sharing milestone.
+- **Migration test (M4).** Kept as a **subset** check (the original 13 files must still ship; additions
+  allowed) rather than `==`. Bounding the ship set from *above* is exactly the interior-churn the design
+  consciously accepted (a scratch file inside a named dir ships) — enforcing it here would fight M6's core
+  feature. Left as an M7+ concern.
+
+**Deferred to Shipping (hand-written).** Deploy to live `~/.claude` + confirm the workflow still fires
+(proof-9) and observe proof-7-live; harvest the new risks — **interior-churn** (a scratch file inside a
+named dir ships; sharpens at M7+) and the **gitignored-secret** cost of cutting git (revisit at sharing);
+update `RISKS` / `PLAYBOOK` / `CHANGELOG`; commit.
+<!-- WF:judgment:b9a87ab6:end -->
+
+<!-- WF:need:b9a87ab6:start -->
+**M6 — Transport & packaging · Need settled (2026-07-16, task `b9a87ab6`).** Dogfooded
+in-repo through the live workflow; converged over four adversarial challenge rounds (three
+material-finding, one clean confirmatory).
+
+**The need — two jobs, not one grand cause:** the workflow shipped (M1–M5) but its packaging
+and docs never caught up.
+1. *Silent-drop (latent).* `sync.py`'s per-file `MANIFEST` silently never-deploys any bundle
+   file you forget to list — the exact "silently green" failure class the methodology exists
+   to kill.
+2. *Stale core (observed).* The always-loaded shipped core (`claude/CLAUDE.md`,
+   `METHODOLOGY.md`) and `VERSION`/`CHANGELOG` don't record the now-live workflow, so a fresh
+   session or a second machine can't discover it (violates P2).
+
+**Settled decisions:**
+- **Plain `~/.claude` bundle only** — a plugin/marketplace form is deferred until an actual
+  decision to share (RISKS #8 is M6's; sharing-safety is the deferred milestone's).
+- **Deploy whole directories**, retiring the per-file *enumeration of directory contents*; a
+  short, stable named-root-files list survives for files that live in no directory.
+- **Coverage principle (ship-side):** everything under `claude/` is *shipped* (named dirs +
+  named root files), *ignored* (explicit junk list incl. `__pycache__`, `*.pyc`, `*.bak`), or
+  *neither → a coverage gap*; ignore takes precedence over ship. `capture` runs over
+  bundle-owned paths only (its source, live `~/.claude`, legitimately holds far more).
+- **Fail loud with teeth:** a coverage gap makes the command **exit non-zero** — not a warning
+  buried in a `Done.` success (which is what today's `! missing, skipped` already is).
+- **Additive copy; pruning deferred** — never delete on the target side (no destructive
+  convergence over `~/.claude`).
+- **Docs:** the shipped core gains the workflow **start-trigger + how-to-run** (the static
+  stand-in for the deferred M7 skip-warner); the full six-step loop goes in `METHODOLOGY.md`;
+  the repo's own deploy docs (root `CLAUDE.md` gotcha, `ARCHITECTURE.md`, `README.md`) are
+  corrected in the same turn (P2).
+- **Version → 0.4.0** — breaks the long-held 0.3.x series to record the workflow's arrival;
+  stays pre-1.0 ("living hypothesis", M7 pending).
+
+**Explicit non-goals:** no plugin; no blacklist "ship-all-except"; no destructive prune of
+`~/.claude`; no `settings.json`/activation change; no change to `workflow.py` (keeps
+repo↔deployed drift at zero, sidesteps RISKS #19); no skip-warner (M7); no core-doc size cap
+or `sync.py` subfolder handling (both would invent absolutes against stated habits).
+
+**Proof bar (T2) — test/local:** directory-deploy without editing `sync.py`; coverage-gap →
+non-zero exit + report; no junk shipped or captured (both directions); `capture`/`status`
+work under the new model; tests green; `VERSION`/`CHANGELOG` bumped; and by **review** — the
+shipped `METHODOLOGY.md` loop docs and the repo's own deploy-doc corrections are present and
+correct. **Live bar:** start-trigger text present in the shipped core and a fresh session
+proposes the workflow unprompted; M6 self-hosted in-repo (closes RISKS #16); `sync.py install`
+deploys clean to live `~/.claude` and the workflow still fires.
+
+**Built in-repo, live** — the first milestone developed with the nudge + status line watching;
+discipline held: no `install` between a step's `prepare` and `record` (RISKS #19).
+<!-- WF:need:b9a87ab6:end -->
+
 **2026-07-16** — **M5 (control layer) — COMPLETE and DEPLOYED.** The six-step workflow now fires on its own:
 a workflow-aware status line (`wf:<step>:<state>`, honest `fresh`/`stale`/`missing`) and a `UserPromptSubmit` +
 `SessionStart` nudge that tells the *model* a challenge is owed — plus the D-2 rooting fix that made one global

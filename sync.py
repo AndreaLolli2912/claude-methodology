@@ -32,31 +32,32 @@ import shutil
 import subprocess
 import sys
 from datetime import datetime
+from fnmatch import fnmatchcase
 from pathlib import Path
 
-# --- The bundle manifest -----------------------------------------------------------------
-# The SINGLE source of truth for which files this repo owns inside ~/.claude, as paths
-# RELATIVE to the .claude root. Written with POSIX "/" separators; pathlib rewrites them to
-# "\" on Windows automatically. Add a new bundled file here once and BOTH directions
-# (install + capture) pick it up — there is no second list to keep in sync.
-MANIFEST = [
-    "CLAUDE.md",
-    "METHODOLOGY.md",
-    "skills/init-project-docs/SKILL.md",
-    "VERSION",                     # machine-readable current version (single source of truth)
-    "CHANGELOG.md",                # parseable release history; source of the update-notice delta
-    "hooks/check_version.py",      # deployed SessionStart hook that checks GitHub for updates
-    "statusline.py",               # deployed status-line renderer: model|effort|context|quota
-    # M5 (D-8): the six-step workflow machinery + its M5 control layer. The SCRIPTS ship here like
-    # everything else; the status line and the nudge are ACTIVATED per-machine by `enable-workflow`
-    # (settings.json is deliberately NOT in the manifest, so install/capture never touch it - D-1).
-    "workflow/workflow.py",        # the deterministic spine (verbs + the importable receipt_state)
-    "workflow/rulebook.md",        # the nine shared challenger rules, bundled by `prepare`
-    "workflow/conductor.md",       # the per-step loop; the nudge injects the slice between its sentinels
-    "agents/challenger.md",        # the challenger subagent definition
-    "workflow/nudge.py",           # the M5 UserPromptSubmit + SessionStart reminder hook
-    "statusline_wf.py",            # the M5 workflow-aware status line (base line + wf:<step>:<state>)
+# --- The bundle definition ----------------------------------------------------------------
+# The bundle is a NAMED WHITELIST whose *contents* are walked from disk — not a per-file list.
+# Three small, rarely-changing constants say what this repo owns inside ~/.claude; the walker
+# (`_bundle_files` below) turns them into the concrete file set by reading the filesystem. The
+# payoff over the old per-file MANIFEST: a file dropped into a named directory ships automatically,
+# with no code edit here (this closes RISKS #8 — a per-file list can't express "everything in this
+# directory"). It stays a whitelist end to end: nothing un-named ever ships.
+BUNDLE_DIRS = ["skills", "agents", "hooks", "workflow"]      # directories shipped WHOLESALE (walked, minus IGNORE)
+BUNDLE_ROOT_FILES = [                                         # the loose files that live in NO directory
+    "CLAUDE.md",         # the always-on core, loaded by Claude Code in every project
+    "METHODOLOGY.md",    # the full rule reference, read on demand
+    "VERSION",           # machine-readable current version (single source of truth)
+    "CHANGELOG.md",      # parseable release history; source of the update-notice delta
+    "statusline.py",     # the plain status-line renderer: model|effort|context|quota
+    "statusline_wf.py",  # the M5 workflow-aware status line (base line + wf:<step>:<state>)
 ]
+# Junk that must NEVER ship, even when it sits inside a named dir ("ignore beats ship"). Matched
+# case-INSENSITIVELY (see `_is_ignored`) so junk is dropped identically on Windows and macOS/Linux.
+# (Named-entry matching, by contrast, is exact / case-sensitive by design: a wrong-case name is caught
+# as a stray and HALTS install rather than silently mis-shipping — fail-loud-safe.)
+# (settings.json is deliberately NOT owned here — it is a personal per-machine file the enable-*
+# verbs edit in place; install/capture never carry it, so activation stays per-box - D-1.)
+IGNORE = ["__pycache__", "*.pyc", "*.pyo", "*.bak", ".ds_store", "*.swp", "thumbs.db"]
 
 # Anchor every path off this script's own folder so the repo can be moved or renamed without
 # breaking anything (the cross-platform equivalent of PowerShell's $PSScriptRoot).
@@ -80,47 +81,206 @@ def _timestamped_backup(dst: Path) -> Path:
     return bak
 
 
-def _copy(src: Path, dst: Path, *, backup: bool) -> bool:
-    """Copy one file src -> dst, creating parent folders as needed.
+def _is_ignored(rel: Path) -> bool:
+    """True if any component of a relative path is junk (an IGNORE glob). Case-normalised — we
+    lowercase each part and match with `fnmatchcase` — so a file's ignore-status is IDENTICAL on
+    Windows and macOS/Linux. (Bare `fnmatch` case-folds according to the host OS, which would make
+    the ship set platform-dependent — a file ignored on one machine but shipped on another.)"""
+    return any(fnmatchcase(part.lower(), pat) for part in rel.parts for pat in IGNORE)
 
-    If `backup` is set and `dst` already exists, first copy it to `dst.<timestamp>.bak` so a
-    replaced file is always recoverable. Returns True on success, or False when `src` is
-    missing — in which case we warn and carry on (parity with the old .ps1 scripts, so one
-    missing file never aborts the whole run).
-    """
+
+def _owns_root_entry(entry: Path) -> bool:
+    """The ONE test for "does the bundle own this top-level entry under a bundle root" — true for a
+    named directory, a named root file, or ignorable junk. Both `_bundle_files` (which ships what it
+    owns) and `_definition_problems` (whose strays are exactly what it does NOT own) consult this, so
+    "what the bundle owns" is decided in a single place: the walker and the gate can never drift into
+    shipping and flagging different sets (the M1 directive — one shared predicate, not two encodings)."""
+    name = entry.name
+    return (_is_ignored(Path(name))                          # junk (e.g. __pycache__, *.bak) — owned but skipped
+            or (entry.is_dir() and name in BUNDLE_DIRS)      # a named bundle directory
+            or (entry.is_file() and name in BUNDLE_ROOT_FILES))  # a named loose root file
+
+
+def _bundle_files(base: Path) -> tuple[list[Path], int]:
+    """Walk a bundle root (`claude/` or a live `~/.claude`) and return (ship, skipped): the shippable
+    files as paths RELATIVE to `base`, and a count of junk files skipped along the way.
+
+    "Shippable" = a named root file that exists, plus every file inside a named directory — minus
+    IGNORE junk. One classified pass over the top level uses `_owns_root_entry` (the SAME test the
+    coverage gate uses), so the walker and the gate agree by construction (M1). A stray top-level
+    entry is simply not shipped here; complaining about it is the gate's job, not the walker's.
+
+    Order is deterministic per machine (top level sorted, then each dir's contents sorted) so install
+    and capture print the same sequence every run. Cross-OS ordering may differ, but counts and
+    membership do not, so nothing downstream depends on the exact order.
+
+    A base that does not exist yet — a fresh machine whose `~/.claude` was never created — walks to
+    nothing rather than crashing on `iterdir()`, so the read verbs (status/capture, via `_live_orphans`)
+    degrade gracefully instead of raising a traceback."""
+    if not base.is_dir():
+        return [], 0
+    ship: list[Path] = []
+    skipped = 0
+    for entry in sorted(base.iterdir()):                     # one classified pass over the top level
+        if not _owns_root_entry(entry):
+            continue                                         # a stray — not ours to ship (the gate reports it)
+        if _is_ignored(Path(entry.name)):
+            continue                                         # owned-but-junk at the top level (e.g. __pycache__/)
+        if entry.is_file():                                  # a named root file -> ship it as-is
+            ship.append(Path(entry.name))
+            continue
+        for path in sorted(entry.rglob("*")):                # a named dir -> ship its whole interior...
+            if not path.is_file():
+                continue
+            rel = path.relative_to(base)
+            if _is_ignored(rel):                             # ...minus junk anywhere inside it (ignore beats ship)
+                skipped += 1
+            else:
+                ship.append(rel)
+    return ship, skipped
+
+
+def _definition_problems(base: Path) -> tuple[list[str], list[str]]:
+    """Compare the whitelist against what is actually on disk under `base` and return (strays,
+    missing) — the two DISTINCT kinds of disagreement, returned SEPARATELY because install answers
+    them differently (a stray HALTS the whole deploy; a missing named entry only REPORTS and ships
+    the rest). Collapsing them into one flat "halt if non-empty" list would silently re-introduce
+    halt-on-missing — the exact regression this gate exists to prevent — so the two must stay
+    tellable-apart at every call site.
+
+      strays  = top-level entries that are neither a named dir, a named root file, nor junk
+                (over-inclusion: "what ships" is ambiguous until you classify it).
+      missing = named entries (a BUNDLE_DIRS or BUNDLE_ROOT_FILES name) absent from disk
+                (under-inclusion: unambiguous, but the bundle can't ship what isn't there).
+    Both directions read the same three constants the walker does, so the constants are the single
+    source of truth and this gate can never disagree with `_bundle_files` about the classification."""
+    strays: list[str] = []
+    missing: list[str] = []
+    # Under-inclusion: a named thing that isn't on disk.
+    for name in BUNDLE_ROOT_FILES:
+        if not (base / name).is_file():
+            missing.append(f"named root file '{name}' is missing — restore it, or drop it from BUNDLE_ROOT_FILES")
+    for d in BUNDLE_DIRS:
+        if not (base / d).is_dir():
+            missing.append(f"named dir '{d}/' is missing — restore it, or drop it from BUNDLE_DIRS")
+    # Over-inclusion: a top-level entry the bundle doesn't own. Coverage gaps are top-level ONLY —
+    # everything deeper is inside a named dir, so it either ships or is IGNORE-junk. (A non-existent
+    # base has no strays — its named entries are already reported 'missing' above — so guard iterdir.)
+    if base.is_dir():
+        for entry in sorted(base.iterdir()):
+            if not _owns_root_entry(entry):
+                strays.append(f"'{entry.name}' is neither a named bundle dir/root file nor IGNORE junk — "
+                              "name it (BUNDLE_DIRS/BUNDLE_ROOT_FILES), move it into a named dir, or add it to IGNORE")
+    return strays, missing
+
+
+def _copy(src: Path, dst: Path, *, backup: bool) -> str:
+    """Copy one file src -> dst (creating parent folders) and report what happened: "new" (dst didn't
+    exist), "replaced" (dst existed and was overwritten), or "missing" (src was gone — nothing copied).
+
+    It used to return a bool; the three-way status lets callers print honest counts and, crucially,
+    never count or announce a file they did not actually write. `missing` is the TOCTOU guard: the
+    gate + walk make a missing SOURCE practically unreachable, but a walked file can still vanish
+    between the walk and this copy — callers treat that as an anomaly (warn + exit non-zero), never
+    as success. If `backup` is set and dst already exists, dst is first copied to `dst.<timestamp>.bak`
+    so a replaced live file is always recoverable."""
     if not src.exists():
         print(f"  ! missing, skipped: {src}", file=sys.stderr)
-        return False
+        return "missing"
+    existed = dst.exists()                          # snapshot BEFORE we touch anything, so we can report new vs replaced
     dst.parent.mkdir(parents=True, exist_ok=True)   # ensure the destination folder exists
-    if backup and dst.exists():                     # never clobber silently: back up first
+    if backup and existed:                          # never clobber silently: back up first
         bak = _timestamped_backup(dst)
         print(f"  backed up {dst.name} -> {bak.name}")
     shutil.copy2(src, dst)                           # copy2 preserves mtime + permission bits
-    return True
+    return "replaced" if existed else "new"
 
 
-def install() -> None:
-    """repo -> ~/.claude: deploy the bundle onto this machine, backing up replaced files."""
-    for rel in MANIFEST:
-        # src lives in the repo's `claude/` mirror; dst is the same relative path under ~/.claude
-        if _copy(BUNDLE_DIR / rel, TARGET_DIR / rel, backup=True):
+def install() -> int:
+    """repo -> ~/.claude: deploy the bundle, backing up replaced files. Returns an exit code — 0 on a
+    clean deploy, non-zero if a named entry was missing or a walked file vanished mid-copy.
+
+    The coverage gate runs FIRST and answers the two disagreements differently. A stray top-level
+    entry HALTS the whole install (deploy nothing — "what ships" is ambiguous, and halting is fully
+    reversible), while a missing named entry only REPORTS and exits non-zero (the covered files still
+    ship — a named thing is simply absent, no ambiguity). This asymmetry is the point: fail-closed on
+    ambiguity, fail-loud-but-forward on a plain absence."""
+    print(f"  repo {BUNDLE_DIR}  ->  {TARGET_DIR}")     # resolved roots FIRST — the cwd-audit habit, even on the halt path
+    strays, missing = _definition_problems(BUNDLE_DIR)
+    if strays:                                          # OVER-inclusion -> fail-closed: deploy NOTHING
+        for s in strays:
+            print(f"  ! {s}", file=sys.stderr)
+        print("  ! a stray top-level entry makes 'what ships' ambiguous — deployed nothing.", file=sys.stderr)
+        return 1
+    for m in missing:                                   # UNDER-inclusion -> report each, but keep going
+        print(f"  ! {m}", file=sys.stderr)
+    ship, skipped = _bundle_files(BUNDLE_DIR)
+    new = replaced = vanished = 0
+    for rel in ship:
+        outcome = _copy(BUNDLE_DIR / rel, TARGET_DIR / rel, backup=True)
+        if outcome == "missing":                        # a walked file vanished before the copy (TOCTOU) — LOUD, never "installed"
+            vanished += 1
+            print(f"  ! vanished before copy, not shipped: {rel}", file=sys.stderr)
+        else:
+            new += outcome == "new"
+            replaced += outcome == "replaced"
             print(f"  installed {rel}")
-    print("\nDone. Restart Claude Code, then check /skills lists 'init-project-docs'.")
+    reported = len(missing)                             # M4: the footer carries the missing-named count, so it agrees with the exit code
+    print(f"\nShipped {new + replaced} file(s), {replaced} replaced; {skipped} junk skipped; "
+          f"{reported} named entr{'y' if reported == 1 else 'ies'} missing; {vanished} vanished.")
+    print("Restart Claude Code, then check /skills lists 'init-project-docs'.")
     print("Tip: run  python sync.py enable-hook  for in-session update notifications.")
     print("Tip: run  python sync.py enable-statusline  to show model|effort|context|quota in the status line.")
     print("Tip: run  python sync.py enable-workflow  to turn on the six-step workflow (nudge + wf status line).")
+    return 1 if (missing or vanished) else 0            # loud on any anomaly; a clean deploy is 0
 
 
-def capture() -> None:
-    """~/.claude -> repo: pull live edits back so they can be committed.
+def capture() -> int:
+    """~/.claude -> repo: pull live edits back so they can be committed. Returns an exit code — 0 on a
+    clean capture (orphans do NOT flip it — a lingering live file is news, not an error), non-zero
+    only if a file vanished mid-copy.
 
-    No backup on this side: the repo is git-tracked, so `git` history (and `git diff` before
-    you commit) is the safety net.
-    """
-    for rel in MANIFEST:
-        if _copy(TARGET_DIR / rel, BUNDLE_DIR / rel, backup=False):
+    No backup on this side: the repo is git-tracked, so `git diff`/history is the safety net. Only the
+    REPO's ship set is pulled — a file that exists live but the repo doesn't own is reported as an
+    orphan and NEVER pulled, so a repo-side deletion can't resurrect itself into the source of truth
+    (F2)."""
+    print(f"  live {TARGET_DIR}  ->  repo {BUNDLE_DIR}")   # resolved roots FIRST (cwd-audit habit)
+    ship, _ = _bundle_files(BUNDLE_DIR)                    # the REPO bundle = the authoritative owned set
+    captured = vanished = 0
+    for rel in ship:
+        if not (TARGET_DIR / rel).exists():
+            print(f"  not on this machine, skipped: {rel}")   # info, not an error (no '!')
+            continue
+        outcome = _copy(TARGET_DIR / rel, BUNDLE_DIR / rel, backup=False)
+        if outcome == "missing":                          # vanished between the check above and the copy (TOCTOU) — honor it (M3)
+            vanished += 1
+            print(f"  ! vanished before capture, not pulled: {rel}", file=sys.stderr)
+        else:
+            captured += 1
             print(f"  captured {rel}")
-    print("\nDone. Now:  git add -A;  git commit -m 'update methodology';  git push")
+    orphans = _live_orphans(ship)
+    for rel in orphans:
+        print(f"  live orphan (present live, not in the bundle — not captured): {rel}")   # info, exit stays 0
+    print(f"\nCaptured {captured} file(s); {vanished} vanished; {len(orphans)} live orphan(s) reported.")
+    print("Now:  git add -A;  git commit -m 'update methodology';  git push")
+    return 1 if vanished else 0                            # orphans are informational — only a vanished file is an anomaly
+
+
+def _live_orphans(repo_ship: list[Path]) -> list[Path]:
+    """Files that exist under the LIVE named dirs but the repo bundle does not own — lingering or
+    foreign leftovers. Reported by capture/status, NEVER pulled (that would let a repo-side deletion
+    resurrect itself — F2). Reuses `_bundle_files(TARGET_DIR)` rather than re-walking, so the walk
+    mechanic lives in exactly one place (M1).
+
+    Named ROOT files are deliberately excluded (`len(rel.parts) > 1` keeps only files inside a dir):
+    the `~/.claude` root is a shared namespace (settings.json, projects/, other tools), so an unowned
+    live root file can't be told from a foreign one — an accepted blind spot (a lingering root file;
+    a wholly-retired directory is the other). Both are low-harm on an additive target."""
+    owned = set(repo_ship)
+    live_ship, _ = _bundle_files(TARGET_DIR)              # reuse the one walker on the live side (M1)
+    return [rel for rel in live_ship
+            if len(rel.parts) > 1                          # skip top-level root files (shared-namespace blind spot)
+            and rel not in owned]                          # keep only what the repo bundle doesn't own
 
 
 # --- Update-check + SessionStart hook wiring ---------------------------------------------
@@ -496,23 +656,20 @@ def _git_status() -> dict:
 
 
 def _live_status() -> list:
-    """Compare each bundle-owned file in the repo against its live ~/.claude copy, byte for byte.
+    """Compare each repo bundle file against its live ~/.claude copy, byte for byte. Returns a list of
+    (relative_path, state) for every file NOT in sync — 'missing' (never installed here) or 'differs'
+    (the live copy isn't the repo's current bytes). Empty = live is fully up to date. Read-only.
 
-    Returns a list of (relative_path, state) for every file NOT in sync — state is 'missing'
-    (never installed on this machine) or 'differs' (the live copy isn't the repo's current copy).
-    An empty list means the live ~/.claude is fully up to date. Read-only: it reads bytes only.
-    """
+    The file list comes from the same `_bundle_files(BUNDLE_DIR)` walk install/capture use, so status
+    can never check a different set than they deploy — and a file dropped into a named dir shows up
+    here the moment it exists, with no list to update."""
     out_of_sync = []
-    for rel in MANIFEST:
-        repo_file = BUNDLE_DIR / rel
+    ship, _ = _bundle_files(BUNDLE_DIR)
+    for rel in ship:
         live_file = TARGET_DIR / rel
-        # A file the manifest names but the repo lacks is a repo/bundle problem, not a live one;
-        # install/capture already warn about a missing source, so we just skip it here.
-        if not repo_file.exists():
-            continue
         if not live_file.exists():
             out_of_sync.append((rel, "missing"))
-        elif repo_file.read_bytes() != live_file.read_bytes():
+        elif (BUNDLE_DIR / rel).read_bytes() != live_file.read_bytes():
             out_of_sync.append((rel, "differs"))
     return out_of_sync
 
@@ -524,6 +681,9 @@ def status() -> int:
     """
     git = _git_status()
     live = _live_status()
+    ship, _ = _bundle_files(BUNDLE_DIR)
+    strays, missing_entries = _definition_problems(BUNDLE_DIR)   # the two coverage disagreements, kept apart (M2)
+    orphans = _live_orphans(ship)
 
     lines = []      # the report lines we'll print, one situation each
     todo = []       # plain-English next steps, collected as we find things out of sync
@@ -571,6 +731,23 @@ def status() -> int:
         else:
             lines.append("  GitHub   in sync - nothing to push or pull.")
 
+    # --- bundle definition: two DISTINCT advisories (M2) -------------------------------------
+    # A stray and a missing named entry get DIFFERENT install responses, so status previews them
+    # distinctly — never a blurred "halt / report". Both are actionable, so both flip the exit code.
+    if strays:
+        synced = False
+        n = len(strays)
+        lines.append(f"  Bundle   {n} stray top-level entr{'y' if n == 1 else 'ies'} under claude/ "
+                     "- install will HALT and deploy nothing.")
+        todo.append("classify the stray(s): name it (BUNDLE_DIRS/BUNDLE_ROOT_FILES), move it into a "
+                    "named dir, or add it to IGNORE")
+    if missing_entries:
+        synced = False
+        n = len(missing_entries)
+        lines.append(f"  Bundle   {n} named entr{'y' if n == 1 else 'ies'} missing from claude/ "
+                     "- install will REPORT and exit non-zero (ships the rest).")
+        todo.append("restore the missing named entr(y/ies), or drop the name from BUNDLE_DIRS/BUNDLE_ROOT_FILES")
+
     # --- repo <-> live ~/.claude -------------------------------------------------------------
     if live:
         synced = False
@@ -585,6 +762,11 @@ def status() -> int:
         todo.append("update your live ~/.claude:  python sync.py install")
     else:
         lines.append("  Live     up to date - ~/.claude matches the repo.")
+    # Live orphans are INFORMATIONAL — printed as a sub-line, but they do NOT flip `synced` (they
+    # never flip capture's exit code either, so status stays consistent with it).
+    if orphans:
+        n = len(orphans)
+        lines.append(f"           (plus {n} file(s) present live but not in the bundle - informational.)")
 
     # --- print the readout -------------------------------------------------------------------
     print("Where you stand:\n")
@@ -598,8 +780,10 @@ def status() -> int:
     return 0 if synced else 1
 
 
-def update() -> None:
+def update() -> int:
     """One-command update: `git pull` the repo, then `install` the refreshed files into ~/.claude.
+    Returns an exit code — install's on a successful pull+deploy, or 1 if we couldn't pull (so the
+    everyday `python sync.py` is loud when it deploys nothing).
 
     This is the "apply" step that the update-check hook only *notifies* about. It works only from
     a git checkout with a reachable remote — a USB/OneDrive copy has no `.git`, so we say so and
@@ -612,7 +796,7 @@ def update() -> None:
         print("  ! Not a git checkout, so there's nothing to pull.", file=sys.stderr)
         print("    Refresh this folder yourself (git clone / re-download / re-copy), then run:")
         print("      python sync.py install")
-        return
+        return 1
 
     print("Pulling the latest methodology from the remote...")
     try:
@@ -623,7 +807,7 @@ def update() -> None:
     except FileNotFoundError:                       # git isn't installed / not on PATH
         print("  ! git was not found on PATH.", file=sys.stderr)
         print("    Install git (or pull manually), then run:  python sync.py install")
-        return
+        return 1
 
     # Echo git's own summary ("Already up to date." / "Fast-forward ...") so the user sees it.
     if pull.stdout.strip():
@@ -635,25 +819,26 @@ def update() -> None:
         if detail:
             print("    " + detail.replace("\n", "\n    "), file=sys.stderr)
         print("    Fix it (commit/stash local edits, or check your network), then retry.", file=sys.stderr)
-        return
+        return 1
 
-    # Pull succeeded (fast-forwarded or already current) -> deploy the now-current files.
+    # Pull succeeded (fast-forwarded or already current) -> deploy the now-current files, and carry
+    # install's exit code up (a missing named entry or a vanished file makes even `update` loud).
     print()
-    install()
+    return install()
 
 
-def default_action() -> None:
-    """What `python sync.py` with NO subcommand does: bring this machine up to date.
+def default_action() -> int:
+    """What `python sync.py` with NO subcommand does: bring this machine up to date, returning the
+    underlying exit code so the everyday command is loud on an anomaly.
 
-    This is the everyday command. On a git checkout it runs `update` (pull the latest, then
-    install); on a plain folder copy (no `.git`, so nothing to pull) it just `install`s what's
-    here. Everything else — capture, check, enable-hook, disable-hook — is a named subcommand.
+    On a git checkout it runs `update` (pull the latest, then install); on a plain folder copy (no
+    `.git`, so nothing to pull) it just `install`s what's here. Everything else — capture, check,
+    enable-hook, disable-hook — is a named subcommand.
     """
     print("No command given — bringing ~/.claude up to date (run  python sync.py -h  for the rest).\n")
     if (REPO_ROOT / ".git").exists():
-        update()          # git checkout: pull the latest, then install
-    else:
-        install()         # plain copy: nothing to pull, just deploy what's here
+        return update()   # git checkout: pull the latest, then install
+    return install()      # plain copy: nothing to pull, just deploy what's here
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -681,12 +866,14 @@ def main(argv: list[str] | None = None) -> int:
                       help="which piece to deactivate (default: all)")
 
     args = parser.parse_args(argv)
+    # install / update / capture / status / no-arg each return an exit code; propagate it so a real
+    # anomaly (a stray, a missing named entry, a vanished file, drift) reaches the shell as non-zero.
     if args.command == "install":
-        install()
+        return install()
     elif args.command == "update":
-        update()
+        return update()
     elif args.command == "capture":
-        capture()
+        return capture()
     elif args.command == "check":
         check()
     elif args.command == "status":
@@ -706,7 +893,7 @@ def main(argv: list[str] | None = None) -> int:
         disable_workflow(args.which)
     else:
         # No subcommand: run the everyday action (update on a git checkout, else install).
-        default_action()
+        return default_action()
     return 0
 
 

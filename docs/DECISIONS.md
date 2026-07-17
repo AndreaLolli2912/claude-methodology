@@ -5,6 +5,47 @@
 
 <!-- WF:anchor:decisions-log -->
 
+<!-- WF:design:b9a87ab6:start -->
+### 2026-07-17 — M6 Design: transport & packaging (the HOW)
+
+Settles how `sync.py` deploys the bundle once the per-file `MANIFEST` is retired (Need: task
+`b9a87ab6`). The bundle becomes a **named whitelist whose contents are walked from disk** — no git
+on the install/capture path.
+
+- **Ship set = a filesystem walk of a named whitelist.** Two small, stable lists: `BUNDLE_DIRS`
+  (`skills/ agents/ hooks/ workflow/`, shipped wholesale) and `BUNDLE_ROOT_FILES` (the six loose
+  root files). A file dropped into a named dir ships because the walk finds it — closing RISKS #8
+  without per-file enumeration. This is a whitelist end-to-end (honouring "whitelist, never
+  blacklist"): nothing un-named ships.
+- **git-as-source was explored and rejected.** Deriving the set from `git ls-files` was tried and
+  hardened over several rounds, then dropped: once the directory whitelist was restored it bought
+  nothing for RISKS #8, while it required a git checkout, broke the edit→`install`-to-test loop for
+  brand-new files (they'd need `git add` first), and coupled the whole coverage model to git. The
+  filesystem walk is simpler, git-free, and consistent with the orphan walk. (Plain-copy install
+  therefore still works; only `update`'s `git pull` needs a checkout.)
+- **Coverage is three-set, ignore-beats-ship, and fails loud — but the two directions differ.**
+  Everything under `claude/` is *shipped* / *ignored junk* (a small curated `IGNORE`) / *neither*.
+  An **over-inclusion** (a stray, undeclared top-level entry) **halts install and deploys nothing**
+  (fail-closed — a present-but-unclassified file makes "what ships" ambiguous; stop and classify it).
+  An **under-inclusion** (a named entry absent from disk) does *not* halt — install ships the covered
+  files, reports the missing ones, and exits non-zero (the Need's floor is a non-zero exit; halting is
+  reserved for the ambiguous/stray case, and this keeps the gate-time and copy-time responses to a
+  missing file consistent).
+- **`capture` pulls back only the repo's ship set; live-only files are reported, never pulled.** That
+  stops a repo-side deletion from resurrecting into the source of truth. A live orphan is *information*
+  (a lingering file), not an error — reported at exit 0, so a routine `capture; commit; push` isn't
+  tripped by benign leftovers. Two inherent orphan blind spots are accepted and documented: a lingering
+  *root* file and a *wholly-retired directory* can't be flagged without history we don't keep.
+- **Additive, and non-invasive.** No prune/delete on the target; no change to `workflow.py`,
+  `settings.json`, or the activation model, so repo↔deployed drift stays zero for the milestone. Every
+  verb prints its resolved roots as line one (cwd-audit habit) and propagates a non-zero exit to the
+  shell on any anomaly. `VERSION` → 0.4.0; the shipped core (`CLAUDE.md`/`METHODOLOGY.md`) gains the
+  workflow trigger + loop, and the repo's own deploy docs are corrected the same turn.
+- **Accepted cost (personal use).** With git cut, a *gitignored* file placed inside a named dir would
+  ship (the walk doesn't consult git). Low blast radius on one's own `~/.claude`; flagged as the first
+  thing the deferred **sharing** milestone must revisit, where blast radius grows.
+<!-- WF:design:b9a87ab6:end -->
+
 ### 2026-07-16 — Workflow machinery M5: Steps 4–6 (Implementation, Judgment, Shipping) — the control layer is LIVE + COMPLETE
 
 **M5 is done and deployed.** The control layer — a workflow-aware status line (`wf:<step>:<state>`) and a

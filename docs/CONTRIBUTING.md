@@ -29,9 +29,10 @@ committing:
 - **Change how docs are scaffolded** → edit
   `claude/skills/init-project-docs/SKILL.md` → reinstall → re-run the skill in a scratch
   repo to test.
-- **Add a new file to the bundle** → put it under `claude/…`, then add its relative path to
-  the `MANIFEST` list in `sync.py` (one place — both `install` and `capture` read it; see
-  `ARCHITECTURE.md` § Contracts).
+- **Add a new file to the bundle** → put it under one of the named directories in `claude/`
+  (`skills/ agents/ hooks/ workflow/`) and it ships automatically — no code edit. A *new top-level*
+  file or directory under `claude/` must be named in `sync.py`'s `BUNDLE_ROOT_FILES`/`BUNDLE_DIRS`
+  (or added to `IGNORE`), or `install` halts until you classify it (see `ARCHITECTURE.md` § Contracts).
 - **Tweak the status line** → edit `claude/statusline.py` → `python sync.py install` → restart
   Claude Code. It's pointed at by a `statusLine` block in `~/.claude/settings.json`, which is
   personal (not bundled), so on a new machine run `python sync.py enable-statusline` to wire it (see `RISKS.md` #7).

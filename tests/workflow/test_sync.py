@@ -153,10 +153,13 @@ st = read_settings()
 check("5c disabling the nudge keeps check_version + unrelated keys",
       any(sync._hook_refers_to_check(c) for c in cmds(st, "SessionStart")) and st.get("otherKey") == "keep-me")
 
-# 6) MANIFEST now ships the six D-8 bundle files (the workflow machinery + the M5 scripts).
+# 6) The bundle still ships the six D-8 files (workflow machinery + M5 scripts). M6 retired the
+#    per-file MANIFEST for a directory-whitelist walk, so we assert against the WALK's ship set now
+#    (they're covered by BUNDLE_DIRS `workflow/`+`agents/` and BUNDLE_ROOT_FILES `statusline_wf.py`).
+_ship6 = {p.as_posix() for p in sync._bundle_files(sync.BUNDLE_DIR)[0]}
 for rel in ("workflow/workflow.py", "workflow/rulebook.md", "workflow/conductor.md",
             "agents/challenger.md", "workflow/nudge.py", "statusline_wf.py"):
-    check("6 MANIFEST ships " + rel, rel in sync.MANIFEST)
+    check("6 bundle walk ships " + rel, rel in _ship6)
 
 # 7) A valid-JSON-but-non-object settings.json (e.g. a list) must be a graceful REFUSE, never a
 #    traceback and never an overwrite - _read_settings now rejects a non-dict parse (the type-

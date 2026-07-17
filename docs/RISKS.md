@@ -5,14 +5,14 @@
 
 | # | Risk | Severity | Status |
 |---|---|---|---|
-| 1 | **Duplicated file manifest.** The bundle-owned path list used to be copy-pasted across two scripts. | Medium | Resolved — single `MANIFEST` in `sync.py` |
+| 1 | **Duplicated file manifest.** The bundle-owned path list used to be copy-pasted across two scripts. | Medium | Resolved — one bundle definition in `sync.py` (a directory whitelist since M6) |
 | 2 | **No cross-platform transport.** Old scripts were PowerShell-only; macOS/Linux couldn't install/capture. | Medium | Resolved & verified (Win + Linux) |
 | 3 | **Silent divergence between repo and `~/.claude`.** Edit live, forget to `capture` → next `install` overwrites your live edits. | High in theory / Low in practice | Overwrite doesn't occur in the repo-only workflow; read-only `status` readout planned |
 | 4 | **`sync.py install` overwrites the whole `~/.claude/CLAUDE.md`.** Unrelated personal instructions there are replaced (backed up, but not merged). | Medium | Documented in README |
 | 5 | **Root `CLAUDE.md` is gitignored** → not synced; a fresh clone won't have it, and its content only exists on the machine that created it. | Low | Accepted (by design) |
 | 6 | **Transport now requires Python 3.** A machine without Python can't install/capture. | Low | Accepted — user runs Python everywhere; stdlib-only |
 | 7 | **Status line isn't auto-wired on a new machine.** `install` deploys `statusline.py`, but the `statusLine` block that points at it lives in the personal (un-bundled) `settings.json` and names this machine's Python path. | Low | Resolved — `sync.py enable-statusline` wires each machine's own interpreter |
-| 8 | **`sync.py` copies file-by-file.** Deploying the workflow machinery (M6) means shipping whole `agents/`/`hooks/` directories, which the per-file `MANIFEST` can't express. | Low | Accepted — deferred to M6 |
+| 8 | **`sync.py` copied file-by-file.** Deploying the workflow machinery means shipping whole `agents/`/`hooks/`/`workflow/` directories, which the per-file `MANIFEST` couldn't express. | Low | **Resolved (M6)** — `sync.py` walks a named directory whitelist (`BUNDLE_DIRS`); a file in a named dir ships automatically |
 | 9 | **Workflow-machinery firing is model-mediated (~70–80%).** The deterministic + live layers are now proven; the residual is that the model *spawning the challenger* is a probabilistic act a hook cannot force. | Medium | Accepted/mitigated — live layer **proven** (smoke-test passed); a miss is made *visible*, not prevented |
 | 10 | **`publish` newline handling assumes a consistent-newline doc.** A doc mixing LF and CRLF is homogenized to its dominant ending on write. | Low | Accepted; docs now pinned LF via `.gitattributes` (`*.md text eol=lf`); revisit other in-place docs at real-system |
 | 11 | **`publish` has no compare-and-swap.** A concurrent external edit in the read→write window is lost; two concurrent mutating runs race on the atomic replace. | Low | Accepted for M3/M4 (sequential single-user CLI); an **M5 tripwire** once a hook can auto-fire `publish` |
@@ -29,12 +29,15 @@
 | 22 | **No self-heal if `.workflow/.gitignore` is removed mid-task.** `start` writes the ignore rule once; if it is externally deleted, drafts under `.workflow/` become `git add`-able again. | Low | Accepted at M5 — single-user, visible in `git status` before any commit; `start` re-creates it on the next task |
 | 23 | **Concurrent same-repo sessions can lose a nudge-state update → one duplicate nudge.** Two sessions racing on `.workflow/nudge-state.json` can clobber each other's quiet-hash. | Low | Accepted/self-healing at M5 — the next turn re-quiets; the message stays true, no correctness impact |
 | 24 | **The deployed hooks don't advertise their own off-switch.** Asked to "turn off the flow," a context-free Claude hand-edits `~/.claude/settings.json` instead of running `sync.py disable-workflow all`. | Low | Accepted at M5 — *found in the live proof* (2026-07-16); contained by the permission prompt + `settings.json` backups; a discoverability nicety for M7 |
+| 25 | **Interior churn ships silently.** The M6 coverage gate guards only the *top level* of `claude/`; everything inside a named dir ships by placement. A scratch / in-progress file left inside `claude/workflow/` (the most-edited tree) ships on the next `install`. | Low (M6) | Accepted — the conscious cost of "content by placement"; *visible* in install's per-file output (not silently dropped), just not *halted*. Sharpens at M7+ when the shipped `workflow/` is edited again |
+| 26 | **A gitignored file inside a named dir ships.** M6 cut git from the ship-set derivation, so the walk doesn't consult `.gitignore` — a secret or local-only file dropped inside a named dir would deploy. | Low (personal use) | Accepted — own `~/.claude`, low blast radius, `claude/` is a curated mirror not scratch space; **the first thing the deferred sharing milestone must revisit**, where the blast radius grows |
 
 ## Detail
 
-**#1 — Duplicated manifest (resolved).** Fixed by collapsing to one script: `sync.py` holds a
-single `MANIFEST` list that both `install` and `capture` read, so there is nothing to keep in
-sync. Adding a bundled file is now a one-line change.
+**#1 — Duplicated manifest (resolved).** Fixed by collapsing to one script: `sync.py` holds one
+bundle definition (since M6, the `BUNDLE_DIRS`/`BUNDLE_ROOT_FILES` whitelist that both `install` and
+`capture` walk), so there is nothing to keep in sync. Adding a file inside a named directory now needs
+no edit at all.
 
 **#2 — Cross-platform (resolved & verified).** Fixed by replacing the two PowerShell scripts
 with one portable `sync.py` (Python 3, standard-library only). `Path.home()` handles the
@@ -72,9 +75,12 @@ differs per machine. *Fixed:* `sync.py enable-statusline` (and `disable-statusli
 `statusLine` block using `sys.executable`, mirroring `enable-hook`, so each machine wires its own
 interpreter with one command. Run it once after `install` on a new box.
 
-**#8 — Directory-copy for the machinery (deferred).** `sync.py`'s `MANIFEST` lists individual files;
-the workflow machinery (M6) adds whole `claude/agents/` and `claude/hooks/` trees. Shipping those needs
-a small directory-copy capability in `sync.py`. Not an M2 problem — recorded so M6 handles it.
+**#8 — Directory-copy for the machinery (resolved, M6).** `sync.py`'s old `MANIFEST` listed individual
+files; the workflow machinery added whole `claude/agents/`, `claude/hooks/`, and `claude/workflow/`
+trees. M6 replaced the per-file list with a **named directory whitelist walked from disk**
+(`BUNDLE_DIRS` + `BUNDLE_ROOT_FILES`), so a file dropped into a named directory ships with no code
+edit, and a coverage gate halts on a stray or reports a missing named entry. See DECISIONS/ARCHITECTURE
+2026-07-17.
 
 **#9 — Model-mediated firing (accepted, mitigated).** The deterministic parts
 (detect the marker, show it, gate the advance, warn on skip) are ~100% reliable, but getting the model
@@ -259,3 +265,26 @@ risking a partial disable (a dropped `check_version`, malformed JSON). Contained
 the edit must pass and the `settings.json` backups, but a real discoverability gap: a one-line "to turn this
 off, run `sync.py disable-workflow all`" in the conductor slice or a `sync.py` hint would close it. Deferred to
 M7 with the other harness-honesty items.
+
+**#25 — interior churn ships silently (accepted at M6).** The directory-whitelist gate
+(`_definition_problems`) classifies only the *top-level* entries under `claude/`; everything deeper is inside
+a named dir, so it ships or is `IGNORE`d — by placement, ungated. That interior — `claude/workflow/`
+especially — is the most-actively-edited part of the repo across M1–M7, so an in-progress or scratch file
+left inside a named dir *will* ship on the next `install`. This is the conscious cost of "content by
+placement" (Design A4/A5), taken for a milestone developed in-repo, live. Two honest qualifiers: the interior
+is not *silent* — `install` prints every file it ships (per-file line + footer count), so a stray interior
+file is *visible* in the output; what the top-level gate adds over that is a **halt**, not the only surfacing.
+And a richer interior *report* stays open as a future option (it is a whitelist read — "show what is about to
+ship" — not the rejected blacklist); only interior *gating* was ruled out. For M6 itself the exposure is low
+(its churn is in `sync.py` at the repo root + the named root docs, so its scratch files land at the top level
+and are caught as strays). The question sharpens at **M7+**, when the shipped `claude/workflow/` machinery is
+edited again.
+
+**#26 — a gitignored file inside a named dir ships (accepted at M6, personal use).** M6's Design explored
+deriving the ship set from `git ls-files` and **rejected** it (it needed a git checkout, broke the
+edit→`install`-to-test loop for brand-new untracked files, and coupled coverage to git). The filesystem walk
+that replaced it does not consult `.gitignore`, so a gitignored file placed *inside* a named directory — a
+secret, a local-only note — would deploy. Accepted as low-harm **today**: the target is the operator's own
+`~/.claude`, `claude/` is a curated mirror not a scratch space, and there is no public audience. It is flagged
+as **the first thing the deferred sharing milestone must revisit** (Need §4 / A1), because the blast radius
+changes the day the bundle is shared. See DECISIONS 2026-07-17 (M6 Design — the git-as-source rejection).

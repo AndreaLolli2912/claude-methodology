@@ -11,18 +11,42 @@ should work on Windows *and* macOS/Linux without installs.
 1) Mirror the target layout inside the repo (here: `claude/` mirrors `~/.claude/`).
 2) Write ONE script with `install`/`capture` subcommands, standard-library only. Python 3 is
    the portable, no-install choice — bash isn't native on Windows, PowerShell 7 isn't on Linux.
-3) Keep a single manifest list in that script; resolve the repo side from
-   `Path(__file__).parent` and the live side from `Path.home()`, so it's location- and
-   OS-independent.
-4) Before overwriting any existing target file, copy it to `*.<timestamp>.bak`.
-5) `capture` is the reverse direction, so live edits round-trip back to the repo.
+3) **Define the bundle as a named whitelist WALKED from disk, not a per-file list:** a few named
+   directories shipped wholesale + a short list of named root files, plus a small `IGNORE` glob list
+   for junk. A file added inside a named directory then ships with **no code edit** — a per-file list
+   can't express "everything in this directory", and each addition to it is a chance to forget one (a
+   silent no-deploy). Resolve the repo side from `Path(__file__).parent` and the live side from
+   `Path.home()`, so it's location- and OS-independent.
+4) **Fail loud on the two ways the whitelist and disk disagree — asymmetrically.** An *un-named*
+   top-level entry (over-inclusion: "what ships" is ambiguous) **halts** and deploys nothing until you
+   classify it; a *named* entry missing from disk (under-inclusion: unambiguous) is **reported** and
+   exits non-zero but still ships the rest. "Ignore beats ship": the `IGNORE` list drops junk even
+   inside a shipped directory. Keep the "is this owned?" test in ONE predicate that both the walker and
+   the gate consult, or they silently diverge.
+5) Before overwriting any existing target file, copy it to `*.<timestamp>.bak`.
+6) `capture` is the reverse direction — but pull back **only the repo's own ship set**, and report a
+   live-only file as an *orphan* (exit 0) rather than pulling it, so a repo-side deletion can't
+   resurrect itself into the source of truth. Additive only; never delete on the target side.
+7) Make every verb **return an exit code** the shell sees (0 clean / non-zero on any anomaly), so the
+   everyday command is loud — a warning buried inside an exit-0 `Done.` is the silent-green this design
+   exists to kill.
 **Gotchas:** one script kills the two-script manifest-drift trap. One-directional overwrite is
 not a merge — decide which side is authoritative and say so loudly. Force `*.py eol=lf` via
-`.gitattributes` so a Windows-edited shebang still runs on Linux.
-**How you know it worked:** on a fresh machine, one command deploys everything and the tool
-picks it up (here: `/skills` lists the bundled skill; core rules take effect after restart).
-Prove it first against a throwaway `HOME`/`USERPROFILE` (assert files land + a re-run backs up).
-**Pointers:** `sync.py`, `README.md`, `.gitattributes` (2026-07).
+`.gitattributes` so a Windows-edited shebang still runs on Linux. A directory walk ships *whatever* is
+inside a named dir — including a gitignored or scratch file (it doesn't consult git); fine for personal
+use on your own machine, but revisit before sharing the bundle (RISKS #25/#26). The walk of the *live*
+side must skip the shared-namespace root (`~/.claude` also holds `settings.json`, `projects/`, other
+tools) — walk only the named dirs there, or a huge unowned tree gets scanned. And guard the walker
+against a not-yet-created target dir (`iterdir()` throws) so the read verbs don't crash on a fresh box.
+**How you know it worked:** on a fresh machine, one command deploys everything and the tool picks it up
+(here: `/skills` lists the bundled skill; core rules take effect after restart). Prove it first against
+throwaway `HOME`/`USERPROFILE` + repo dirs — assert a file dropped in a named dir lands with no code
+change, a stray halts and copies nothing, a missing named entry reports + exits non-zero, and junk never
+ships either way. Guard the migration with a one-shot "the walk == the old file list" check, then relax
+it to a *subset* (the old files still ship) so it doesn't false-fail the day you add a file.
+**Pointers:** `sync.py` (`_bundle_files`, `_owns_root_entry`, `_definition_problems`, `_live_orphans`),
+`docs/ARCHITECTURE.md` ("M6 — the directory-whitelist transport"), `OVERVIEW.md`/`DECISIONS.md`
+2026-07-17 (M6), `.gitattributes` (2026-07).
 
 ## Scaffold project docs from a methodology skill
 **When you need this:** every new repo should start with the same documentation spine.

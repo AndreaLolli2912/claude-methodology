@@ -1,10 +1,10 @@
-# Working methodology — always-on core (v0.3.4)
+# Working methodology — always-on core (v0.4.0)
 
 > Personal, loaded in every project. These are the invariants I don't skip.
 > The full rule set (Requirements / Project / Development / Testing + the OODA
 > mapping + the doc-naming convention) lives in `~/.claude/METHODOLOGY.md` — read it
 > when a situation goes beyond this core. A project's own `CLAUDE.md` may override.
-> This is a living hypothesis (v0.3.4): when a rule misfires, revise it and log why.
+> This is a living hypothesis (v0.4.0): when a rule misfires, revise it and log why.
 
 ## Operate as a loop (OODA)
 **Observe** (gather / elicit) → **Orient** (synthesize; restate the shared model;
@@ -49,3 +49,19 @@ Prefer small, fast cycles; re-observe after every act.
   Canonical names: `README.md`, `CLAUDE.md` (root); `docs/OVERVIEW.md`,
   `docs/DECISIONS.md`, `docs/ARCHITECTURE.md`, `docs/CONTRIBUTING.md`, `docs/RISKS.md`,
   `docs/PLAYBOOK.md`.
+
+## The six-step workflow — opt-in, one task at a time
+When a task is worth the rigour, run it through the **six-step adversarial workflow**: **Need →
+Design → Architecture → Implementation → Judgment → Shipping**. At each step a separate *challenger*
+AI attacks the proposal before it settles, a deterministic script (`workflow.py`) gates advancement
+on a real challenge, and the settled prose is written into the project's docs as you go. This is the
+machinery that makes the six invariants above actually *run* instead of relying on memory.
+
+It stays **off** until you turn it on for a specific task — no marker, no workflow, so quick fixes
+and throwaway scripts are untouched:
+
+    python ~/.claude/workflow/workflow.py start "add dark mode"
+
+Ending the task (`workflow.py reset`) removes the marker. Turn on the ambient status-line indicator +
+nudge once per machine with `python sync.py enable-workflow`. The **full per-step loop** (how to draft,
+challenge, record, publish, and advance) is in `~/.claude/METHODOLOGY.md`.

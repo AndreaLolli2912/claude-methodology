@@ -7,15 +7,21 @@
 Two layers, deliberately kept separate:
 
 **Content (the bundle) — `claude/`.** The methodology itself, mirroring the layout of
-`~/.claude`:
-- `claude/CLAUDE.md` — the always-on core, loaded by Claude Code in every project.
-- `claude/METHODOLOGY.md` — the full rule reference, read on demand.
-- `claude/skills/init-project-docs/SKILL.md` — the docs-scaffolding skill.
-- `claude/statusline.py` — the status-line renderer (model | effort | context | quota), run by
-  Claude Code on each status refresh and pointed at by a `statusLine` block in `settings.json`.
+`~/.claude`. The bundle is a **named whitelist** — four directories shipped wholesale plus six loose
+root files — whose contents are walked from disk (so a file dropped into a named directory ships with
+no code change):
+- **Root files:** `claude/CLAUDE.md` (the always-on core), `claude/METHODOLOGY.md` (the full rule
+  reference), `claude/VERSION` + `claude/CHANGELOG.md` (version + release history), and the two
+  status-line renderers `claude/statusline.py` (model | effort | context | quota) and
+  `claude/statusline_wf.py` (the same, plus a `wf:<step>:<state>` segment).
+- **`claude/skills/`** — the `init-project-docs` docs-scaffolding skill.
+- **`claude/hooks/`** — `check_version.py`, the SessionStart update-check hook.
+- **`claude/workflow/` + `claude/agents/`** — the six-step adversarial workflow machinery (the
+  `workflow.py` spine, the challenger's rulebook, the per-step conductor, the nudge hook, and the
+  `challenger` agent). Its own architecture is the "Workflow machinery" section below.
 
 **Transport (the script) — repo root.** Pure file-moving; it knows *nothing* about the
-content's meaning, only which relative paths the bundle owns:
+content's meaning, only which named directories + root files the bundle owns:
 - `sync.py install` — repo → `~/.claude` (deploy; backs up what it replaces).
 - `sync.py capture` — `~/.claude` → repo (reverse; stage live edits for commit).
 - `sync.py status` — read-only readout of where you stand across GitHub ↔ repo ↔ live
@@ -29,12 +35,15 @@ content/transport split is the key boundary: you can edit the methodology withou
 the script, and vice versa.
 
 ## Contracts
-- **The file manifest.** `sync.py` holds one list of bundle-owned relative paths in its
-  `MANIFEST` constant (currently the core, the full reference, the `init-project-docs` skill,
-  `VERSION`/`CHANGELOG.md`, the update-check hook, and `statusline.py` — `MANIFEST` itself is
-  the authoritative enumeration). This single list is the contract between transport and content — adding a file
-  to the bundle is a one-line edit in one place. (This is why the old two-script manifest
-  drift risk is gone; see `RISKS.md` #1.)
+- **The bundle definition.** `sync.py` names what the bundle owns in three small constants —
+  `BUNDLE_DIRS` (four directories shipped wholesale: `skills/ agents/ hooks/ workflow/`),
+  `BUNDLE_ROOT_FILES` (six loose root files), and `IGNORE` (junk globs) — and *walks the filesystem*
+  to turn them into the concrete file set. This is the contract between transport and content: a file
+  dropped into a named directory ships automatically (no edit), and a coverage gate keeps it honest —
+  a stray, un-named top-level entry under `claude/` **halts** install until it is classified, while a
+  named entry missing from disk is **reported** and exits non-zero (the rest still ships). It replaced
+  a per-file `MANIFEST` that couldn't express "everything in this directory" (see `RISKS.md` #8; the
+  older two-script drift risk it also closed is #1).
 - **Path resolution.** `sync.py` anchors on its own folder (`Path(__file__).parent`, repo
   side) and `Path.home() / ".claude"` (live side). Moving the repo is safe; the live target
   follows the OS home directory.
@@ -415,3 +424,167 @@ marker (structural in the M6/M7 self-hosting loop); concurrent hook processes co
 *append* file (why the marker/receipts are never hook-authored). Deferred to M7: the skip-warner,
 forcing the cold read (α-2), and built-in reviewers.
 <!-- WF:arch:control-layer:end -->
+
+<!-- WF:arch:directory-whitelist:start -->
+## M6 — the directory-whitelist transport (Architecture settled 2026-07-17)
+
+The rewrite of `sync.py`'s deploy path from a per-file `MANIFEST` (one hand-maintained
+line per shipped file) to a **named whitelist walked from disk**. This section maps the
+pieces of the new transport and the contracts between them; the *why* (git-as-source
+explored and rejected, the fail-closed choice) is settled in `DECISIONS` (2026-07-17) —
+here is the *structure*. It changes only the transport layer (`sync.py`); the bundle's
+*content* and the whole workflow subsystem are untouched.
+
+**The one principle that shapes everything below:** the bundle is defined by **name** (four
+directories + six loose root files) but its **contents come from the filesystem**, not a
+list — so a file dropped into a named directory ships with no code edit (this closes RISKS
+#8, the per-file manifest's inability to express a directory). Two guards keep that honest:
+no **un-named top-level** entry ships (a stray there **halts** install — "what ships" is
+ambiguous until you classify it), and no **named** entry is silently dropped (a missing one
+is **reported and exits non-zero**, though the covered files still deploy; a live-only file
+is reported too). Files *inside* a named directory ship by placement — the gate guards the
+curated top level, not the interior — so the transport never *silently* ships an un-named
+top-level entry, nor *silently* drops a named one.
+
+### The bundle definition — the single source of truth for "what ships"
+Three module constants replace the ~14-line `MANIFEST`:
+- **`BUNDLE_DIRS`** = `skills, agents, hooks, workflow` — shipped wholesale (walked).
+- **`BUNDLE_ROOT_FILES`** = the six files that live in no directory (`CLAUDE.md`,
+  `METHODOLOGY.md`, `VERSION`, `CHANGELOG.md`, `statusline.py`, `statusline_wf.py`).
+- **`IGNORE`** = curated junk globs (`__pycache__`, `*.pyc`, `*.bak`, …).
+
+Two helpers turn those names into a concrete file set, read from disk:
+- **`_is_ignored(rel)`** — true if any path component is junk. Case-normalised (lowercase +
+  `fnmatchcase`) so a file's ignore-status is **identical on Windows and macOS/Linux** —
+  bare `fnmatch` case-folds per-OS, which would make the ship set platform-dependent.
+- **`_bundle_files(base) -> (ship, skipped)`** — **the walker.**
+  Given either root (`claude/` or the live `~/.claude`), it returns the shippable files
+  (named root files that exist, then everything under each named dir) minus `IGNORE`
+  (skipped junk is *counted*, so the report stays honest), in a deterministic order.
+  It is the single source of the **ship set of record**: install, capture, and status all
+  take their file list from it, so they cannot disagree on what the bundle *is*. The one
+  place that also needs a *live-side* walk — the orphan check — should **reuse this same
+  walker** (`_bundle_files(TARGET_DIR)`, then filter out the shared-namespace root files with
+  a one-line predicate) rather than re-implement the `rglob` loop, so the walk mechanic and
+  the "what-counts-as-owned" test each live in exactly one place. (Implementation owns that
+  centralisation; the Design's separate-walk sketch is not binding on it.) "Ignore beats
+  ship": junk **inside** a named dir is still skipped.
+
+### The coverage gate — two disagreements, two responses
+The price of walking from disk (instead of an explicit list) is that a *mistake* on disk
+must be caught, not shipped. The gate runs **before install writes anything** — and because
+the two kinds of disagreement get **different** responses, it must return them **separately**,
+not as one flat list. The interface is therefore
+`_definition_problems(base) -> (strays, missing)` — the stray (over-inclusion) entries and the
+missing (under-inclusion) named entries as **two lists** — so install can branch on them.
+(A single flat list consumed as "halt if non-empty" would collapse both kinds into a halt and
+silently re-introduce halt-on-missing, the exact behavior the settled record overturned — the
+RISKS #15 regression this step exists to close. Implementation may realise this as two lists
+or two small predicates; the binding contract is only that the two kinds are *distinguishable*
+at the call site.) The gate reads the same three constants the walker does, so the single
+source of truth is those **constants**; `_bundle_files` is the single source of the ship-set
+*value*. The two responses:
+- **A stray (over-inclusion) halts install and deploys nothing** — fail-closed. A stray is a
+  **top-level** entry under `claude/` that is neither a named dir, a named root file, nor
+  junk (a `claude/notes.md`, an un-named `claude/prompts/`). It makes "what ships"
+  *ambiguous*, so install stops and classifies it rather than guess. Safe because it is fully
+  reversible (nothing was written) and the fix is one line (name it, move it into a named
+  dir, or `IGNORE` it). Gaps are top-level-only by construction: everything deeper is inside
+  a named dir, so it either ships or is `IGNORE`d.
+- **A missing named entry (under-inclusion) does *not* halt** — a `BUNDLE_DIRS` /
+  `BUNDLE_ROOT_FILES` name that is absent from disk is **reported**, install **ships the
+  covered files anyway**, and the run **exits non-zero**. There is no ambiguity (a named
+  thing is simply absent), the Need's floor is only a non-zero exit, and this keeps the
+  response consistent with a file that vanishes at *copy* time (below): both report + count +
+  non-zero, rather than nuke the whole deploy over one absent file.
+
+**Envelope — be honest about what the gate does *not* cover.** It guards the **top level** of
+`claude/` only; the *interior* of the named dirs ships by placement. And that interior —
+`claude/workflow/` especially — is the **most-actively-edited part of the whole repo** (the
+live machinery being built across M1–M7). So the guarded zone is the rarely-touched boundary
+and the *unguarded* zone is the high-churn core: an in-progress or scratch file left inside a
+named dir during development *will* ship on the next install. This is the accepted cost of
+"content by placement" (Design A4/A5), consciously taken for a milestone developed in-repo,
+live. Two honest qualifiers keep this from overselling either way: (1) the interior is not
+*silent* — install prints every file it ships (per-file line + footer count), so a stray
+interior file is **visible** in the output; what the top-level gate adds over that is a
+**halt**, not the only surfacing. (2) Surfacing what ships is *not* the rejected blacklist —
+"report what is about to ship" is a whitelist read, not "enumerate what doesn't belong" — so a
+richer interior *report* stays open as a future option; only interior *gating* was ruled out.
+For **M6 itself** the exposure is low: M6's churn is in `sync.py` (repo root, unshipped) and
+the named root docs, so its scratch files land at the top level and are caught as strays. The
+interior question sharpens at **M7+**, when the shipped `claude/workflow/` machinery is edited
+again — recorded as a forward concern, not an M6 fix.
+
+### The shared copier (`_copy`)
+`_copy(src, dst, *, backup)` gains a **status return** — `"new"` / `"replaced"` /
+`"missing"` (it was a bool) — so callers can print honest counts (N shipped, R replaced)
+instead of guessing. It has exactly two call sites (install, capture). `"missing"` is
+**handled, never green-washed**: the gate + walk make a missing *source* practically
+unreachable, but a walked file can still vanish between the walk and the copy (a TOCTOU
+race), so install warns, counts it, and exits non-zero rather than print "installed" for a
+file it did not copy.
+
+### The three verbs — each rooted, each fail-safe
+- **`install` (repo → live).** Print the resolved `repo → target` roots **first** (the
+  cwd-audit habit, even on the halt path) → run the coverage gate: **halt on a stray**
+  (deploy nothing), otherwise report any missing named entry and carry on → walk the ship
+  set → copy each (backing up what it replaces) → footer counts (shipped / replaced / junk
+  skipped / vanished). Returns non-zero if a named entry was missing or a file vanished.
+- **`capture` (live → repo).** Walk the **repo's** ship set (the authoritative owned set) →
+  pull back each file that exists live → report live orphans as *information* but **never
+  pull them**, so a repo-side deletion cannot resurrect itself into the source of truth.
+  **Exits 0 even with orphans** — a lingering live file is news, not an error, so a routine
+  `capture; commit; push` is never tripped by benign leftovers. (This ship-set walk is Design
+  **F2**; it supersedes the Need's looser "pull back the whitelisted locations" phrasing — the
+  two differ only on a repo-deleted-but-still-live file, which F2 correctly does *not*
+  resurrect. Flagged for the **Judgment** step to formally correct the Need text — RISKS #15.)
+- **`status` (read-only).** Keeps its existing GitHub↔repo half untouched; its repo↔live
+  half now walks the same ship set and adds two advisories before the drift line — a
+  **coverage problem** (actionable: "install will halt / report" — folds into the exit-1 it
+  already returns for "something to do") and **live orphans** (informational — printed, but
+  they do not by themselves flip the exit code, matching `capture`).
+
+**Exit codes reach the shell for every verb:** `install`/`capture` now return `int` (as
+`status` already did) and `main` propagates each code, so the everyday `python sync.py` is
+loud on a real anomaly — a missing named entry, a vanished file — instead of exiting 0 with a
+warning buried in a `Done.`. A live orphan is *not* such an anomaly: it stays exit 0.
+
+### The orphan check (`_live_orphans`)
+`_live_orphans(ship)` lists files under the **live** named dirs that the repo ship set does
+not own — lingering or foreign. Reported by capture and status, never pulled. Two inherent
+blind spots are documented, both low-harm on an additive target: a lingering **root** file
+(the `~/.claude` root is a shared namespace — `settings.json`, `projects/`, other tools —
+so we can't treat every unowned root file as an orphan) and a **wholly-retired directory**
+(once un-named, its live leftovers are no longer walked). Both would need history we don't
+keep.
+
+Because an orphan is reported at **exit 0** (not a non-zero latch), a benign lingering file
+never cries wolf — which is what lets the report stay generous. In practice orphans are rare
+anyway: the one live process that persists state, the update-check hook, writes its cache to
+the `~/.claude` **root** (`.methodology-update-check.json`, which this walk skips), and
+nothing else lands in a live named dir except `__pycache__` (`IGNORE`d). So the orphan line
+is a quiet informational nudge, not a gate.
+
+### Boundaries — what M6 deliberately does not touch
+- **No change to `workflow.py`, `settings.json`, or the activation model** → repo↔deployed
+  drift stays zero, sidestepping RISKS #19 (an `install` hot-swapping the running
+  `workflow.py`).
+- **Additive only** — no delete/prune on the target; orphans are reported, never removed.
+- **Plain-copy (non-git) install still works** — the walk needs no git, so a USB/OneDrive
+  copy still deploys (only `update`'s `git pull` needs a checkout, as today).
+- **The content/transport split holds** — this is all transport; `sync.py` still knows
+  nothing about what the bundle *means*, only which named paths it owns.
+- **Root resolution is unchanged and cwd-independent** — M6 rewrites *file selection*
+  (`MANIFEST` → walk), **not** *root resolution*. `BUNDLE_DIR` / `TARGET_DIR` stay
+  `Path(__file__)` / `Path.home()`-anchored, and every new walker resolves paths against
+  those anchored roots, so a verb run from *any* working directory still resolves to this
+  repo — the operator's first tacit failure mode (a stray `cd` poisoning a cwd-persistent
+  Bash) cannot mis-target the walk. The one cwd-sensitive call, `_git -C REPO_ROOT`, is
+  likewise anchored; and install/capture print the resolved roots first, so a mis-root is
+  visible immediately.
+- **Doc debt, flagged not hidden:** the hand-written `## Components` / `## Contracts` /
+  `## Stack` prose at the top of this file still describes the retired `MANIFEST`. It is
+  corrected in **Implementation**, the same turn `sync.py` changes (P2) — i.e. when the code
+  actually makes it stale — not now, while the code it describes is still live.
+<!-- WF:arch:directory-whitelist:end -->

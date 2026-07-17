@@ -69,7 +69,7 @@ has exactly one job:
 You're not forced into all of them — tell Claude to skip any you don't want. The payoff is a
 project that explains itself later, instead of "why is it built like this?" archaeology.
 
-## The six-step workflow — opt-in (being built)
+## The six-step workflow — opt-in (shipped)
 
 Everything above is **always on**. This is the other half of the repo: machinery that makes the
 rules actually *run* on real work, instead of depending on someone remembering them.
@@ -97,12 +97,12 @@ creates it — you, running `start`:
 No marker, no workflow. Small projects, quick fixes, and throwaway scripts are untouched by it.
 Ending a task (`workflow.py reset`) removes the marker again.
 
-**Status — not finished, and not installed.** The machinery is built and passes its tests, but
-nothing fires it automatically yet (every command above is typed by hand), and `sync.py` does
-not deploy it — so it is **not** in your `~/.claude` today. Two milestones remain: the *control
-layer* (a status-line step indicator plus two soft-flag hooks, so it runs on its own), then
-packaging. The full design and build plan live in `docs/WORKFLOW.md`; current status is in
-`docs/OVERVIEW.md`.
+**Status — deployed; on only when you ask for it.** The machinery is built, tested, and now
+**shipped**: `python sync.py` deploys it into `~/.claude`, and `python sync.py enable-workflow` turns
+on the ambient control layer — a `wf:<step>:<state>` status-line indicator plus a soft nudge when a
+step owes a challenge, so a task runs on its own. It still stays **off per task** until you run
+`workflow.py start`, so nothing changes for quick fixes. The full design lives in `docs/WORKFLOW.md`;
+current status is in `docs/OVERVIEW.md`.
 
 ## Contents
 - `claude/CLAUDE.md` — the always-on core (loaded in every project)
@@ -113,9 +113,11 @@ packaging. The full design and build plan live in `docs/WORKFLOW.md`; current st
 - `claude/hooks/check_version.py` — SessionStart hook that flags when a newer version exists
 - `claude/statusline.py` — a compact status line (model · effort · context %+tokens · 5h quota %+reset time); turn it on with `python sync.py enable-statusline`
 - `claude/workflow/` and `claude/agents/challenger.md` — the six-step workflow machinery: the script
-  (`workflow.py`), the challenger's nine rules (`rulebook.md`), the per-step loop (`conductor.md`),
-  and the attacker itself. **In the repo, not yet deployed** — see the section above.
-- `sync.py` — one script: deploy/update `~/.claude`, capture edits back, or check/enable the update hook
+  (`workflow.py`), the challenger's rules (`rulebook.md`), the per-step loop (`conductor.md`), the
+  nudge hook, and the attacker itself. Deployed by `sync.py`; turn on the ambient status line + nudge
+  with `python sync.py enable-workflow` (see the section above).
+- `sync.py` — one script: deploy/update `~/.claude`, capture edits back, check/enable the update hook,
+  or enable the status line + workflow control layer
 
 ## Set it up — and keep it current — with one command
 Get this folder onto the machine (`git clone <your-repo-url>`, or copy it via any channel your
@@ -166,6 +168,7 @@ same way the update hook does. Restart Claude Code to see it, and turn it off an
 | `python sync.py check` | Manually ask "is a newer version published?" (the hook already does this) |
 | `python sync.py enable-hook` · `disable-hook` | Turn the in-session update notice on / off |
 | `python sync.py enable-statusline` · `disable-statusline` | Show / hide the status line (model, effort, context, quota) |
+| `python sync.py enable-workflow` · `disable-workflow` | Turn the six-step workflow control layer (status-line step indicator + nudge) on / off |
 | `python sync.py capture` | Reverse direction — copy live `~/.claude` edits back into the repo, then `git commit` |
 
 **Editing the methodology yourself?** Change the files under `claude/`, run `python sync.py` to

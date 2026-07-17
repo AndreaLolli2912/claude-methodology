@@ -5,6 +5,24 @@
 > the human-readable changelog. Each release is one `## <semver> — <date>` heading followed
 > by `- ` bullet lines. Newest first. Keep the heading grammar stable — a parser binds to it.
 
+## 0.4.0 — 2026-07-17
+- **The six-step adversarial workflow now ships and runs.** The machinery built across M1–M5 (never
+  versioned until now) is deployed by `sync.py` and activated per-machine with `python sync.py
+  enable-workflow`: a task walks Need → Design → Architecture → Implementation → Judgment → Shipping,
+  a separate *challenger* AI attacks each step, and a deterministic script gates advancement and
+  writes the docs. It stays **off** until you run `python workflow.py start "<task>"` in a project — no
+  marker, no workflow. The control layer adds a workflow-aware status line (`wf:<step>:<state>`) and a
+  soft `SessionStart`/`UserPromptSubmit` nudge when a step owes a challenge.
+- **`sync.py` deploys whole directories instead of a per-file list.** The hand-maintained `MANIFEST`
+  is retired for a **named directory whitelist walked from disk**: four bundle directories
+  (`skills/ agents/ hooks/ workflow/`) ship wholesale plus six named root files, so a file dropped
+  into a named directory now ships automatically — no code edit (this closes the old "the list can't
+  express a directory" gap). A coverage gate fails loud: a stray, un-named top-level entry under
+  `claude/` **halts** install (deploy nothing) until you classify it; a named entry missing from disk
+  is **reported** and exits non-zero (the rest still ships). `install`/`capture`/`status` now return a
+  real exit code, so `python sync.py` is loud on any anomaly; `capture` reports live-only *orphans* as
+  information (exit 0) and never pulls them.
+
 ## 0.3.4 — 2026-07-13
 - Added `python sync.py status`: a **read-only** readout of where you stand across
   GitHub ↔ repo ↔ live `~/.claude`. It reports git state (uncommitted / not-pushed /

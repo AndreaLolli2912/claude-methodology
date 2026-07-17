@@ -6,11 +6,14 @@
 > as a living document: when a rule proves wrong or missing in real use, revise it here
 > and record why in the project's decision log.
 >
-> **Version 0.3.3** (2026-07-13). Deployed as: lean core → `~/.claude/CLAUDE.md`; this
+> **Version 0.4.0** (2026-07-17). Deployed as: lean core → `~/.claude/CLAUDE.md`; this
 > reference → `~/.claude/METHODOLOGY.md`; doc scaffolding → the `init-project-docs` skill;
 > version + changelog + update-check hook → `claude/VERSION`, `claude/CHANGELOG.md`,
-> `claude/hooks/check_version.py`; status line → `claude/statusline.py`. Enforcement hooks for P1/P2 (a *different* mechanism from
-> the update-check hook shipped in v0.3.0) are planned for v0.4 after further real-project use.
+> `claude/hooks/check_version.py`; status line → `claude/statusline.py`; and the **six-step
+> adversarial workflow** (below) → `claude/workflow/` + `claude/agents/challenger.md`, activated
+> per machine with `python sync.py enable-workflow`. The workflow is the P1/P2 enforcement
+> mechanism earlier versions only anticipated: it makes the invariants *run* on a task instead of
+> relying on memory.
 
 ## How to read this
 Two structures, on different axes:
@@ -137,6 +140,60 @@ act; a plan is a hypothesis, not a promise.
 - **T3 — Validate on realistic input, then confirm live.** Measure against representative
   data; where offline data can mislead (it often *underestimates* real conditions), confirm
   under live conditions before trusting the result.
+
+## The six-step adversarial workflow (opt-in machinery)
+The invariants above say *what* discipline to keep; this machinery makes it *run* on a task, so it
+doesn't depend on remembering. It is **opt-in, one task at a time** — it wakes only when a
+`.workflow/marker.json` exists in the project you're working in, and only `workflow.py start` creates
+it. No marker, no workflow; quick fixes and throwaway scripts stay untouched. Turn on the ambient
+status-line indicator + nudge once per machine with `python sync.py enable-workflow`.
+
+### The six steps
+A task walks six steps; each settles one question and writes its answer into the project's docs, so
+the next task starts from a blank slate and still knows everything that was decided:
+
+| Step | Settles | Lands in |
+|---|---|---|
+| 1. Need | What is actually needed — and what it must explicitly *not* do | `docs/OVERVIEW.md` |
+| 2. Design | Which approach we take, and why the alternatives lost | `docs/DECISIONS.md` |
+| 3. Architecture | The internal structure: the parts and the boundaries between them | `docs/ARCHITECTURE.md` |
+| 4. Implementation | The code, in small tested + commented blocks | code + tests |
+| 5. Judgment | Does the built thing actually meet the Need? Go / no-go | `docs/DECISIONS.md` |
+| 6. Shipping | What breaks in the real world; record the risk, harvest the lesson, commit | `RISKS` / `PLAYBOOK` / `CHANGELOG` |
+
+### The per-step loop
+For each step, drive this loop. A single deterministic script (`workflow.py`) is the sole author of
+every *verifying* act — receipts, freshness, the gate — so the model never vouches for its own work:
+
+1. **Propose.** Do the step's work; write the draft into `.workflow/draft-<step>.md`.
+2. **Prepare** — `workflow.py prepare <step>`. Assembles the challenger's bundle at
+   `.workflow/context.md` (the shared rulebook + your draft + the settled record + operator context)
+   with a fresh one-time canary. It refuses if the draft or rulebook is missing.
+3. **Challenge** — spawn the `challenger` subagent, pointed at `.workflow/context.md` and *nothing
+   else*. It attacks the proposal and writes `.workflow/challenge.md`, echoing the canary as proof it
+   read the real bundle (don't paste the rules or canary into its prompt — they ride inside the
+   bundle by design).
+4. **Record** — `workflow.py record <step>`. Verifies the canary echo, confirms the draft is
+   unchanged since prepare, and writes the receipt. Skip the challenge and there is simply no
+   receipt — that gap is meant to be visible.
+5. **Settle with the human.** Bring the challenger's ranked points (blocking / material / minor) and
+   decide together. **Fold accepted corrections into the DRAFT, not only the published entry** —
+   later steps' challengers cold-read the *drafts*, so a fix that lives only in the entry is invisible
+   to them. Revising the draft makes the receipt stale and re-runs the round; that round is the point.
+6. **Publish** — draft the settled prose into `.workflow/publish-entry.md`, then
+   `workflow.py publish <step>`; the script (not you) places it between the doc's sentinels.
+7. **Advance** — `workflow.py advance`, gated on a fresh receipt. `advance --force` is a conscious,
+   recorded override (it stamps the step "overridden").
+
+Two steps differ in shape: **Implementation** has no single prose challenger — its code is red-teamed
+block by block and it earns no formal receipt (advance past it with `--force`, the real proof being
+the tests). **Shipping** has no auto-doc — the risk register, playbook, and commit stay hand-written.
+
+### One challenge pass, then settle
+Default to **one** challenge round per step. Re-challenge only for a genuine *blocking break* — not
+for material, minor, or wording points; fold those in and move on, or note them. Reversing a decision
+the human already made, or treating every challenger nit as a redesign mandate, manufactures endless
+rounds. Stop when a whole round changes nothing that matters and the human accepts.
 
 ## Document naming convention
 
