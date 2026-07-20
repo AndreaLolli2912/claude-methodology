@@ -37,6 +37,94 @@ every machine in sync through git.
 
 <!-- WF:anchor:current-status -->
 
+<!-- WF:need:b86710c6:start -->
+**M7 — The harness stops overclaiming · Need settled (2026-07-17, task `b86710c6`).**
+Dogfooded in-repo through the live workflow; converged over **seven** adversarial challenge
+rounds. The count was earned, not churn: the milestone *shrank* as it went — a bundle split was
+explored across four rounds and dropped, and `#15` was carved out to M8 — rather than reversing
+settled calls. The scope test each round was T2 (prove it) and the whitelist-shape rule
+(*a claim that keeps needing one more exception is the wrong shape*).
+
+**The need — the harness tells a challenger things that are not true, and stays silent about one
+thing that is.**
+1. *It claims the challenger knows only the bundle.* Four shipped texts say so — the rulebook
+   (*"you inherit no chat memory: the bundle is all you get"*), `challenger.md:8`
+   (*"the context bundle... is the ONLY thing you know"*), `OPERATOR.md`'s Scope, and
+   `cmd_prepare`'s docstring (*"forcing is deferred to M4"*, a milestone shipped twice ago). All
+   false: a spawned subagent receives the global + project `CLAUDE.md` and this project's
+   auto-memory index **before it reads a byte**, and that index carries operator-habit lines that
+   are warm content by the harness's own definition. Sixteen consecutive challengers reported
+   holding the two passes apart *by discipline, not by the harness* — because the contamination
+   arrives by injection, ahead of the bundle, so no bundle shape reaches it.
+2. *Warm-source drift is unreported (RISKS #18).* `record` re-hashes the artifact and refuses a
+   change; warm sources get no equivalent. (A whole-bundle `context_hash` is written to every
+   receipt at `workflow.py:657` and **never verified** — infrastructure R-2 can reuse.)
+
+**Settled decisions:**
+- **The two-pass is an honest convention, not an enforced gate.** M7 does *not* split the bundle.
+  A cold read cannot be forced against an agent that arrives pre-injected and holds `Read` — the
+  same blacklist shape (*a claim about the complement of a set we don't control*) that failed
+  three times in M5's hook contract. So α-2 is **closed by making the harness honest about it**,
+  not by new machinery: no shipped text will claim a cold read is forced, enforced, deferred, or
+  achieved (R-1). This applies the canary's own doctrine one level up — *catch the honest mistake,
+  accept the model can read the file too.* The split's benefit was conceded unmeasurable and its
+  measured harm was zero, against a real cost column (a warm canary, a read-warm-first incentive,
+  a marker-schema hazard, a rewrite of a passing ordering test, and a ripple through the pinned
+  `challenger.md`); T2 does not buy that.
+- **Warm drift is reported — durable, visible, never refused (R-2).** `record` names a changed
+  warm source, still writes the receipt, exits 0. Durable = recorded in the receipt beside the
+  hashes; visible = also on **stderr** (the operator's standing surface for harness-to-agent
+  signal, `_print_root`, 2026-07-16), because `cmd_status` prints no other receipt field. The
+  message claims only that *the bundled bytes differ from the file now* — never that the challenger
+  read stale context (its own `Read` reaches the live file regardless); claiming the stronger thing
+  would be the overclaim R-1 removes. Refusing was **rejected** (operator): it costs a full
+  re-round for editing one's own notes, and `OPERATOR.md`'s two recorded mid-task edits both
+  happened *because a challenger flagged the file* — drift is the file's designed response to a
+  round, not an edge case.
+- **The false fact in `OPERATOR.md` is corrected, and `global_habits` re-decided (R-3).** M7
+  carries the operator's corrected statement (it does not derive it) and re-decides the
+  `global_habits` token — keep, change, or retire — against the corrected fact. The seam worth
+  naming: `OPERATOR.md`'s errors so far are all *platform* claims (0-for-2), while its *habit*
+  claims have held.
+- **The harness warns when run from the wrong copy (R-4 — a conscious exception).** When the
+  running copy is not the deployed one and it walks up onto a live marker, it says so — warn,
+  never block. This exists because the 0.4.0 pin (below) is discipline the operator cannot enforce
+  on the agent typing half the commands, whose working directory drifts on its own. `BUNDLE` is
+  already `__file__`-relative (`:51`), so the script knows where it lives; how it learns the
+  *deployed* location is Design's.
+
+**Scoped out — every item with a door:**
+- **To M8 (the record's identity):** `#15` (`prior_settled` hands later challengers a draft
+  labelled "settled record"), vouching the placed block, and the entry's second audience. **This
+  holds the only measured harm in the theme** (n=1, observed live) — deferred on *cost*, not
+  merit: it needs a block reader the engine lacks, architecture's per-section shape, and carve-outs
+  for steps that never publish. M8 inherits the three-way choice `RISKS.md:149-151` names, which
+  M7 does not pre-settle.
+- **By the theme test** (*fidelity of what a challenger is shown*): **RISKS #24**, the
+  **skip-warner**, an **install-side guard in `sync.py`**, and **built-in reviewers** — each
+  re-homed to the next milestone touching the deploy/control layer; if none is proposed by the
+  milestone after M8, each is taken up alone or explicitly closed. **R-4 is the stated exception**
+  to this rule — its hazard strands *this milestone's own task*, which is the distinguisher
+  (proximity, not evidence).
+- **RISKS #26** → the sharing milestone. **RISKS #25** → out as work, live as a hazard (M7 edits
+  `claude/workflow/`, the ungated interior).
+
+**Constraint — surgery on its own table.** M6 bought safety with "no change to `workflow.py`"; M7
+cannot (R-2 and R-4 edit it). The deployed copy **stays at 0.4.0 for the whole run**; `install`
+only after `reset` closes the task. This is discipline, not construction (RISKS #19), and R-4 is
+the one part that is construction — covering the route discipline was never going to reach.
+
+**Proof bar (T2):** by **search** — no in-scope shipped text claims the challenger knows only the
+bundle or that a cold read is forced (reported "N of N"). By **test** — warm drift lands in the
+receipt *and* on stderr with honest wording; an untouched source reports nothing; R-4 warns from a
+non-deployed copy on a live marker and stays silent with no marker; the artifact and canary gates
+still refuse; **all 250 checks stay green, unchanged** (no bundle change means
+`test_workflow.py:119-133`'s ordering assertion now stands as a regression test). By
+**review** — `global_habits` has a recorded keep/change/retire decision. **Live, after close** — a
+fresh post-`reset` task's `prepare`/`record` behave and the drift report + guard fire in a real
+session (owner: the operator, first task after M7).
+<!-- WF:need:b86710c6:end -->
+
 <!-- WF:judgment:b9a87ab6:start -->
 ### 2026-07-17 — M6 Judgment: transport & packaging — GO
 
