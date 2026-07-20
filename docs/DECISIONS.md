@@ -5,6 +5,104 @@
 
 <!-- WF:anchor:decisions-log -->
 
+### 2026-07-20 — M7 Architecture settled: the file-level change-map (four adversarial rounds)
+
+**What settled.** M7's Architecture — the WHERE for the settled Design — is a **file-level change-map** (no new
+component: M7 edits shipped text, deletes one receipt field, retires one warm slot, adds tests). It settled after
+**four adversarial challenge rounds**, converging when round 4 returned **no blocking** and confirmed the mechanism
+sound. Advanced by a **recorded override** (`advance --force`): round 4's completeness/consistency corrections were
+folded after recording, staling the receipt, and the operator chose not to run a 5th round. The full change-map —
+every file, line, and disposition — lives in `.workflow/draft-architecture.md`; no `ARCHITECTURE.md` section was
+auto-published because M7 adds no new architecture (its `ARCHITECTURE.md` edits are doc-sync, done at Implementation).
+
+**The rounds sharpened completeness, not mechanism** — each caught the *same class*, a narrow site named and the
+surrounding unit missed, which is M7's own theme turned on its own change-map:
+- **R-1 tests** moved from raw byte-matching to a **`_norm`-based** comparison (strip `**` / `> ` / collapse
+  whitespace), after round 2 showed byte-identity is infeasible across a `> `-blockquote (`rulebook.md`) and a prose
+  site (`challenger.md`), and round 1's single-line rule was reflow-brittle. Three tests (presence / equality /
+  absence) + an **A2-seam guard** (round 4), with the absence set widened to all four deleted strings across both files.
+- **`global_habits` retire** grew from the Design's 3 sites → 8 (survey) → 9 (round 2) → **full retire** incl. the
+  `.gitignore`/`reset` plumbing, its doc-sync, and a `test_rooting.py` R2/R7 **rework** — round 3 caught that the
+  plumbing's comments are falsified by the cut and that the round-2 "~no test churn" claim was wrong (`test_rooting.py`
+  asserts the `.gitignore` bytes). A repo-wide `global[ _-]?habits` sweep replaced the self-contradictory "zero hits"
+  bar with "only the enumerated historical LEAVEs survive" (parity with the `context_hash` sweep).
+- A **by-file index** (round 4) was added so per-file completeness is checkable at a glance and the two same-line
+  collisions (`ARCHITECTURE.md:238`, `OPERATOR.md:21`) are visible — the organizational fix for the class of miss.
+
+**Two operator decisions (R2), on corrected costs.**
+1. **Full retire `global_habits`** (not the lighter "clean the dead code") — confirmed against the *corrected* cost
+   after round 3 surfaced the missed `test_rooting.py` churn: the file existed *for* the warm slot, R-3 retires the
+   slot, so its git/reset special-casing is infrastructure for a deleted feature.
+2. **Normalized equality supersedes the Design's byte-identical (R12-M2)** — consciously cleared (rule 4) because
+   byte-identity across a blockquote + prose site is infeasible; normalized equality preserves the anti-drift intent.
+   The Design record (`draft-design.md` R12-M2) is annotated to match; this bullet is the DECISIONS-side forward-note.
+
+**Standing constraint.** The deployed `workflow.py` stays 0.4.0 for the whole run; `install` only after `reset`
+(RISKS #19). All R-1/R-2/R-3 edits land at Implementation next.
+
+### 2026-07-20 — M7 Design settled: the challenge harness's own honesty (the honesty core)
+
+**What settled.** M7's Design — the HOW for Need `WF:need:b86710c6` — settled after **twelve adversarial challenge
+rounds** (`fd31b8bd…` … `bd9f1db5…`), converging when the first round on the *trimmed* design returned no blocking
+finding and re-proved the inherited Need call (honesty over a bundle split). Settled by a **recorded override**:
+`publish` was blocked by a stale receipt (round 12's fidelity refinements were folded after recording), and the
+operator chose to skip a 13th validation round — so this entry is hand-written and Design was advanced with
+`advance --force`. The full round-by-round record lives in `.workflow/draft-design.md`.
+
+**Scope, after the round-11 trim.** M7 ships its **honesty core** and defers the speculative guards:
+
+- **R-1 — de-overclaim the challenger-facing text, on two axes.** *Axis 1* (the challenger-facing lie): a single
+  **canonical block**, asserted **byte-identical** at `rulebook.md:8` and `challenger.md:8`, with consistent
+  clause-fixes at rule 6 and `challenger.md:27`. The block tells the challenger it starts isolated (no main chat,
+  none of the builder's private reasoning — that isolation is its fresh eyes), judges the cold section on its own
+  written record, holds **all** injected operator memory (habits, preferences, **or facts**) for the warm pass,
+  applies the methodology **core** / project instructions *as the standard it measures against — not more evidence,
+  not the thing under judgement*, and takes its **attack rules from the bundle, not anything injected**. It is
+  presence-guarded, so it asserts nothing about the runtime. *Axis 2* (developer-facing "a force is deferred/coming"
+  staleness): the `cmd_prepare` docstring, `WORKFLOW.md:399-404`, `ARCHITECTURE.md:238`, grep-swept for completeness.
+- **R-3 — correct `OPERATOR.md` (operator-authored) + retire `global_habits`.** The false platform claims (a
+  challenger "inherits none of the memory"; "global habits live in `~/.claude` memory" — no such store exists) are
+  corrected in the operator's own words, **independently checked against the measured injection facts** (neutral
+  probe n=2 + filesystem). The redundant `global_habits` warm slot is retired (`warm_sources = ["operator"]`); its
+  detail channel folds into `OPERATOR.md`.
+- **R-2 — reduced to the `context_hash` cleanup.** Delete the orphan `context_hash` receipt field — unreproducible
+  (it hashed a bundle containing the random canary) and reader-less. No warm-drift detection.
+- **Deferred (→ RISKS).** Warm-source drift detection (every design so far fires on the common response-edit →
+  alarm fatigue) and R-4's wrong-copy warning (missed the Need's own common case, undogfoodable, aimed away from the
+  operator's real cwd-drift instability).
+
+**Why the trim (the decisive arc).** Rounds 6–11 showed R-4 and R-2's warm-drift — kept at round 8 for completeness
+— were the source of nearly every finding, and round 11 showed each is **defective, not merely thin**: R-4 fails its
+own Need (a whole task from one non-deployed copy stays silent) and cannot be dogfooded; R-2 backfires on the natural
+edit-then-`record` order (drift on every response-edit → alarm fatigue). Trimmed both to the solid, dogfoodable core.
+
+**Proof bar (T2).** R-1: a bounded closed set of owned surfaces + three mechanical tests — **presence**,
+**cross-file equality**, and **absence of the known-deleted strings** (a closed, finite regression guard, expressly
+*not* the forbidden open blacklist) — plus a bounded semantic review and a **fail-only** decoy smoke test. R-2:
+`context_hash` written nowhere, gates unaffected. R-3: reads-true + operator-authored + probe-checked platform facts.
+Deferred hazards, the reframe's (unproven-but-fail-detectable) discipline, and the methodology-repo self-reference
+are recorded as honest limitations.
+
+**Standing constraint.** The *deployed* `workflow.py` stays at 0.4.0 for the whole run; no `install` until after
+`reset` closes the task (RISKS #19).
+
+### 2026-07-20 — Doc-sync: corrected stale repo-navigation docs (post-M6)
+
+Housekeeping, no code change — the navigation docs had lagged the M6 (v0.4.0) transport switch and
+mis-stated git tracking.
+- **Root `CLAUDE.md`:** the "add a payload file to `MANIFEST`" section was stale — M6 retired the
+  per-file `MANIFEST` for the `BUNDLE_DIRS`/`BUNDLE_ROOT_FILES` filesystem walk. Rewritten to the real
+  model (drop into a named dir → auto-ships; a new loose root file → `BUNDLE_ROOT_FILES`, else it's a
+  stray that halts install). Also fixed the false claim that `docs/` is gitignored — only the root
+  `CLAUDE.md` is (2026-07-05); `docs/` is tracked. Completed the docs map (`WORKFLOW.md`, `OPERATOR.md`
+  were missing).
+- **`OVERVIEW.md` roadmap table:** rows 4–5 still said "v0.3.3 / M1–M4 passed / M6–M7 remain"; updated to
+  **M1–M6 complete, deployed v0.4.0, M7 (harness honesty) in progress (Need settled)**. The prose
+  current-status below the table was already current — only the table lagged.
+
+Root `CLAUDE.md` is gitignored, so its correction is local-only; the `OVERVIEW.md` / `DECISIONS.md`
+edits commit.
+
 <!-- WF:design:b9a87ab6:start -->
 ### 2026-07-17 — M6 Design: transport & packaging (the HOW)
 

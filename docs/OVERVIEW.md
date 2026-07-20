@@ -30,8 +30,8 @@ every machine in sync through git.
 | 1 | Windows bundle: core + methodology + `init-project-docs` skill, install/capture scripts | Done (v0.1) |
 | 2 | Git-based sync as the primary multi-machine flow (clone → pull → install; capture → commit → push) | In use; may automate |
 | 3 | Cross-platform support — one `sync.py` runs install & capture on Windows/macOS/Linux | Done |
-| 4 | Grow the bundle (more skills/agents) as the methodology matures | In progress (v0.3.3: status line) |
-| 5 | Active adversarial workflow (six steps + a challenger) that makes the rules *run* | Building — M1–M4 passed; **M5 (control layer) COMPLETE and DEPLOYED** (2026-07-16) — the **two** ambient pieces (workflow-aware status line + nudge; the skip-warner dropped on measured evidence → M7) + the D-2 rooting fix, installed into `~/.claude` and proven live; 205 checks green. **The workflow now fires on its own.** Later milestones (M6/M7) remain (`docs/WORKFLOW.md`) |
+| 4 | Grow the bundle (more skills/agents) as the methodology matures | In progress (v0.4.0: bundle now ships `agents/`, `hooks/`, `workflow/` alongside `skills/`) |
+| 5 | Active adversarial workflow (six steps + a challenger) that makes the rules *run* | Building — **M1–M6 complete**: the workflow is built, **deployed (v0.4.0)**, and **fires on its own** (workflow-aware status line + nudge + the D-2 rooting fix, live in `~/.claude`); M6 shipped the directory-whitelist transport. **M7 (harness honesty) in progress — Need, Design & Architecture settled** (Architecture through 4 challenge rounds, 2026-07-20); **Implementation next**. Later milestones remain (`docs/WORKFLOW.md`) |
 
 ## Current status
 
