@@ -41,6 +41,13 @@ the model (scaffold + start + conduct), so a misread half-initializes — a *vis
 green (RISKS #9's class). Live `/start-task` confirmation is the operator's, after `sync.py install` + a
 Claude Code restart.
 
+**Fix (same day).** First live invocation crashed: Claude Code runs any inline exclaim-backtick command
+(or a fenced exclaim block) in a skill body at load time — even inside an HTML comment — and the skill's
+own maintainer comment held the literal example it was describing, so every `/start-task` errored before
+doing anything. Rephrased it in prose; added `tests/workflow/test_skill_safety.py`, which fails on any
+such trigger in a shipped skill — the static guard that stands in for the live slash-command invocation
+the suite can't run. Lesson (P3): never put the literal exclaim-backtick form in skill text; describe it.
+
 ### 2026-07-21 — README rewritten as a self-contained guide (consumers + developers)
 
 **What changed.** Rewrote the root `README.md` (193 → ~375 lines) into a fully self-contained document:

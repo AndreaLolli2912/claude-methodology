@@ -18,7 +18,7 @@ disable-model-invocation: true
   human act — the ONE typed `/` command the design allows (docs/WORKFLOW.md "Ground rules"). The
   rest of the flow is agent-driven via conductor.md; Claude must never start a task on its own.
 
-  WHY PROMPT-DRIVEN, not a pre-executed !`command`. The bootstrap has to BRANCH — is this a git
+  WHY PROMPT-DRIVEN, not a shell command pre-executed at skill-load time. The bootstrap has to BRANCH — is this a git
   repo? are the docs there? is there existing code to survey? — and quote the goal safely for the
   shell. A fixed pre-baked shell line can't do any of that; Claude, reading the steps below, can.
   It also runs in Claude's Bash tool (POSIX on every OS), so this one file works on Windows,
