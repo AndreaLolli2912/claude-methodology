@@ -93,10 +93,14 @@ start? — as distinct from the small *micro*-judgement the human makes at every
   not a maybe:** whether the bootstrap should become a `/start-task` command. It would be strictly friendlier
   than typing `python claude/workflow/workflow.py start "…"`, and it violates nothing the rationale protects.
   **The operator's criterion is usefulness** — *"we might accept `/` commands if we find them useful"*, *"if it
-  solves ambiguity or makes the tool better"* (2026-07-15). That criterion is **empirical, so this is not
-  decidable now**: nobody has typed the long form on real work yet, because nothing is deployed. **Decision
-  point: M5's Judgment step** — the first moment real-use evidence exists, since M5 ends installed and used
-  (M5 proof item 10). **Not decided.**
+  solves ambiguity or makes the tool better"* (2026-07-15). That criterion was **empirical, so it was not
+  decidable then**: nobody had typed the long form on real work yet. **DECIDED (2026-07-21, post-M7):
+  yes — built as the `/start-task` chat command** (`claude/skills/start-task/`). Real-use friction settled
+  it — typing `python ~/.claude/workflow/workflow.py start "…"` is awkward and `~` doesn't expand in
+  PowerShell/cmd. `/start-task "<goal>"` scaffolds any missing docs, runs the bootstrap in Claude's own
+  shell, and opens the Need step; it is **manual-only**, so the flow stays agent-driven and only the
+  human-owned bootstrap is ever typed. (M5's Judgment was the original decision point; the deciding
+  evidence actually arrived in real use after M7.)
 - **Docs writing themselves is a hard requirement**, not a nice-to-have.
 - **The observer is the human.** (A neutral observer *AI* was considered and set aside — the human
   already fills that seat.)

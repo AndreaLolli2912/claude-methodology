@@ -1,10 +1,10 @@
-# Working methodology — always-on core (v0.5.0)
+# Working methodology — always-on core (v0.5.1)
 
 > Personal, loaded in every project. These are the invariants I don't skip.
 > The full rule set (Requirements / Project / Development / Testing + the OODA
 > mapping + the doc-naming convention) lives in `~/.claude/METHODOLOGY.md` — read it
 > when a situation goes beyond this core. A project's own `CLAUDE.md` may override.
-> This is a living hypothesis (v0.5.0): when a rule misfires, revise it and log why.
+> This is a living hypothesis (v0.5.1): when a rule misfires, revise it and log why.
 
 ## Operate as a loop (OODA)
 **Observe** (gather / elicit) → **Orient** (synthesize; restate the shared model;
@@ -58,10 +58,12 @@ on a real challenge, and the settled prose is written into the project's docs as
 machinery that makes the six invariants above actually *run* instead of relying on memory.
 
 It stays **off** until you turn it on for a specific task — no marker, no workflow, so quick fixes
-and throwaway scripts are untouched:
+and throwaway scripts are untouched. Start one from Claude's chat with **`/start-task`**:
 
-    python ~/.claude/workflow/workflow.py start "add dark mode"
+    /start-task add dark mode
 
-Ending the task (`workflow.py reset`) removes the marker. Turn on the ambient status-line indicator +
-nudge once per machine with `python sync.py enable-workflow`. The **full per-step loop** (how to draft,
-challenge, record, publish, and advance) is in `~/.claude/METHODOLOGY.md`.
+It scaffolds any missing project docs, runs the bootstrap, and opens the Need step — so you never type
+the deployed path yourself. (It's a thin front door over the manual
+`python ~/.claude/workflow/workflow.py start "…"`, which still works.) End the task with `workflow.py reset`. Turn on the
+ambient status-line indicator + nudge once per machine with `python sync.py enable-workflow`. The
+**full per-step loop** (draft, challenge, record, publish, advance) is in `~/.claude/METHODOLOGY.md`.

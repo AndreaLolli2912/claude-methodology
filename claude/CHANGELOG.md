@@ -5,6 +5,17 @@
 > the human-readable changelog. Each release is one `## <semver> — <date>` heading followed
 > by `- ` bullet lines. Newest first. Keep the heading grammar stable — a parser binds to it.
 
+## 0.5.1 — 2026-07-21
+- **`/start-task` — a chat command to start a workflow task.** A new user skill (`skills/start-task/`)
+  is the human-owned bootstrap: type `/start-task "<goal>"` in Claude's chat and it scaffolds any missing
+  project docs, runs `workflow.py start` in Claude's own shell, and opens the Need step — no more typing
+  the deployed `~/.claude/workflow/workflow.py` path (`~` never expanded in PowerShell/cmd). Manual-only
+  by design: the flow stays agent-driven; only the bootstrap is typed.
+- **`init-project-docs` now scaffolds workflow-ready docs.** Its OVERVIEW / DECISIONS / ARCHITECTURE
+  skeletons carry the seeded `<!-- WF:anchor:<slug> -->` comments the workflow's `publish` requires, so a
+  freshly-scaffolded repo can let the docs write themselves (previously the first publish refused — the
+  anchors were only ever hand-placed). Guarded by a new `test_scaffold_docs.py`.
+
 ## 0.5.0 — 2026-07-21
 - **The challenge harness stops overclaiming (M7).** The text a *challenger* reads no longer tells it
   things that are not true: gone are the claims that the challenger "knows only the bundle" and that a cold

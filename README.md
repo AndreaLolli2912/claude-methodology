@@ -95,15 +95,15 @@ flowchart LR
   H -->|"sync.py — git pull + install"| L
 ```
 
-**The workflow loop — how a task moves through the six steps.** Exactly one thing starts a task
-(`workflow.py start`), which writes a `.workflow/marker.json`. For each step the builder drafts, the
+**The workflow loop — how a task moves through the six steps.** Exactly one thing starts a task — the
+`/start-task` chat command, a front door over `workflow.py start` — which writes a `.workflow/marker.json`. For each step the builder drafts, the
 script bundles the challenger's context, a challenger subagent attacks it, the script records a
 *receipt* proving the challenge happened, you settle, the docs get published, and the step advances —
 gated on a fresh receipt. Shipping ends the task with `reset` + a commit.
 
 ```mermaid
 flowchart TD
-  S["workflow.py start — begin a task"] --> D["builder drafts the step's draft file"]
+  S["/start-task — scaffold docs + begin a task"] --> D["builder drafts the step's draft file"]
   D --> PR["workflow.py prepare — bundles rulebook + COLD + canary + WARM"]
   PR --> C["challenger subagent — attacks cold, then warm; echoes the canary"]
   C --> RE["workflow.py record — verify canary + hash the draft, write the receipt"]
@@ -238,8 +238,9 @@ everything that was decided.
    component; Shipping has no auto-doc (RISKS / PLAYBOOK / CHANGELOG / commit stay hand-written).
 7. **`advance`** — gated on a fresh receipt; `advance --force` is a conscious, recorded override.
 
-It stays **off** until you run `python workflow.py start "<task>"` (which creates the marker) and ends
-when `python workflow.py reset` removes it. No marker, no workflow — quick fixes and throwaway scripts
+It stays **off** until you start a task — from Claude's chat with **`/start-task "<goal>"`** (which
+scaffolds any missing docs, runs the bootstrap, and opens Need), or by hand with `python workflow.py
+start "<task>"` — and ends when `python workflow.py reset` removes the marker. No marker, no workflow — quick fixes and throwaway scripts
 are untouched. Turn on the ambient status-line indicator + nudge per machine with
 `python sync.py enable-workflow`.
 
@@ -272,8 +273,10 @@ Run it again any time to update. (Use `python3` on macOS/Linux.)
 | `python sync.py enable-statusline` · `disable-statusline` | Show / hide the status line |
 | `python sync.py enable-workflow` · `disable-workflow` | Turn the six-step control layer (step indicator + nudge) on / off |
 
-**Driving a workflow task** (the deployed engine; run `python "$HOME/.claude/workflow/workflow.py"`, or
-`%USERPROFILE%\.claude\workflow\workflow.py` on Windows):
+**Driving a workflow task.** Start one from Claude's chat with the **`/start-task "<goal>"`** command —
+it scaffolds any missing docs, runs the bootstrap in Claude's own shell, and opens the Need step, so you
+never type the path. Under the hood it drives the deployed engine (`python "$HOME/.claude/workflow/workflow.py"`,
+or `%USERPROFILE%\.claude\workflow\workflow.py` on Windows), whose verbs are:
 
 | Command | What it does |
 |---|---|

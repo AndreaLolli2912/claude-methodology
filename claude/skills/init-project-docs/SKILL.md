@@ -1,7 +1,7 @@
 ---
 name: init-project-docs
 description: Scaffold the standard project documentation set (OVERVIEW, DECISIONS, ARCHITECTURE, CONTRIBUTING, RISKS, PLAYBOOK, README) and wire the repo to the personal working methodology. Use when starting a new project, when the user asks to "set up docs", "scaffold docs", or "init project docs", or when a repo is missing the standard documentation files.
-version: 0.2.0
+version: 0.3.0
 tools: Read, Write, Edit, Glob
 ---
 
@@ -11,6 +11,12 @@ Scaffold a project's standard documentation set, following the personal working
 methodology's naming convention (`~/.claude/METHODOLOGY.md`). Each file is created with a
 header stating its purpose and maintenance rule, plus a minimal skeleton for the user to
 fill in.
+
+The `OVERVIEW`, `DECISIONS`, and `ARCHITECTURE` skeletons also carry seeded
+`<!-- WF:anchor:<slug> -->` comments — invisible when rendered — so the six-step adversarial
+workflow's `publish` step can place its settled prose into them (that engine *refuses* a doc
+that lacks the anchor, so a scaffold without them would block the workflow's first publish).
+Leave them in place if you use the workflow; they're harmless if you don't.
 
 ## When to use
 Starting a new project, or an existing repo lacks the standard docs. Safe to re-run: it
@@ -72,6 +78,9 @@ clearly-marked `TODO` placeholders instead.
 | 1 | <...> | TODO |
 
 ## Current status
+
+<!-- WF:anchor:current-status -->
+
 <date + where things stand>
 ```
 
@@ -81,6 +90,8 @@ clearly-marked `TODO` placeholders instead.
 
 > Why things are the way they are. Add a dated entry whenever a task finishes or a plan is
 > executed (newest first). Keep each entry short: what changed and why.
+
+<!-- WF:anchor:decisions-log -->
 
 ### <YYYY-MM-DD> — Project docs scaffolded
 Standard documentation set created via the init-project-docs skill, following the personal
@@ -95,6 +106,9 @@ working methodology's naming convention.
 > when components are added/removed or the stack changes.
 
 ## Components
+
+<!-- WF:anchor:architecture-sections -->
+
 <what each part is; keep the data-moving layer separate from the logic — methodology P4>
 
 ## Contracts

@@ -5,6 +5,42 @@
 
 <!-- WF:anchor:decisions-log -->
 
+### 2026-07-21 — `/start-task` chat command for the workflow bootstrap
+
+**What changed.** Added a human-owned **`/start-task "<goal>"`** slash command (a new user skill,
+`claude/skills/start-task/SKILL.md`) so a workflow task starts from Claude's chat instead of typing the
+deployed `python ~/.claude/workflow/workflow.py start "…"` path (long, and `~` doesn't expand in
+PowerShell/cmd). In one motion it scaffolds any missing standard docs, runs the bootstrap in Claude's own
+shell, and opens the Need step — surveying existing code first in an already-built repo, drafting from
+scratch in an empty one. It ships automatically (`skills/` is already a `BUNDLE_DIRS` entry) and is
+**manual-only** (`disable-model-invocation`), so the flow stays agent-driven and only the bootstrap is
+ever typed — resolving the long-open `/start-task` question in `docs/WORKFLOW.md`.
+
+**Why these shapes (R2).** *Skills format, not legacy `commands/`* — `skills/` already ships, so no
+`sync.py` change, and it's consistent with `init-project-docs`. *Prompt-driven, not a pre-executed
+`!`command* — the bootstrap must branch (git repo? docs present? existing code?) and quote the goal
+safely, which a fixed shell line can't; it also runs in Claude's POSIX Bash tool, so one file works on
+every OS. *Built directly, not through the six-step workflow* — one orchestrating skill wiring existing
+pieces (operator's call).
+
+**The integration gap it surfaced, and the fix.** The workflow's `publish` engine (`_place_block`)
+**refuses** a doc lacking its seeded `<!-- WF:anchor:<slug> -->` comment, but `init-project-docs`'
+skeletons never seeded them (this repo's own anchors were hand-placed during M3/M4). So a freshly
+scaffolded repo would start the workflow, then refuse the first publish — "the docs write themselves"
+would fail. Fixed by seeding the three anchors (current-status / decisions-log / architecture-sections)
+in `init-project-docs`' OVERVIEW / DECISIONS / ARCHITECTURE skeletons (that skill 0.2.0 → 0.3.0), the
+natural home for the standard-doc contract; the anchors are invisible HTML comments, harmless to a
+non-workflow project. `/start-task` also heals an older anchor-less scaffold by adding the missing
+anchors before starting.
+
+**Proof (T2).** A new `tests/workflow/test_scaffold_docs.py` (sibling of `test_seed_docs.py`) lifts the
+three skeletons from the skill and simulates each doc's first publish via `_place_block` — all accept,
+each block lands under its anchor, and a stripped-anchor negative control is refused. Full suite: 11
+files, 270 checks, green. Version 0.5.0 → 0.5.1. **Model-mediated caveat:** the command's body runs via
+the model (scaffold + start + conduct), so a misread half-initializes — a *visible* gap, not a false
+green (RISKS #9's class). Live `/start-task` confirmation is the operator's, after `sync.py install` + a
+Claude Code restart.
+
 ### 2026-07-21 — README rewritten as a self-contained guide (consumers + developers)
 
 **What changed.** Rewrote the root `README.md` (193 → ~375 lines) into a fully self-contained document:

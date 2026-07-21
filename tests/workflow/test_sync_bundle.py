@@ -244,7 +244,7 @@ sync._git_status = _saved_git
 # 14a is the single hand-maintained anchor (a real bump edits this literal); 14b-d derive from it, so they
 # auto-follow the anchor and only fail when another site drifts away from VERSION.
 VER14 = (REPO_ROOT / "claude" / "VERSION").read_text(encoding="utf-8").strip()
-check("14a claude/VERSION is 0.5.0", VER14 == "0.5.0")
+check("14a claude/VERSION is 0.5.1", VER14 == "0.5.1")
 _changelog14 = (REPO_ROOT / "claude" / "CHANGELOG.md").read_text(encoding="utf-8")
 check("14b claude/CHANGELOG.md carries the CURRENT VERSION's entry (not a stale forever-true match)",
       "## {} ".format(VER14) in _changelog14)

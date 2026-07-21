@@ -6,7 +6,7 @@
 > as a living document: when a rule proves wrong or missing in real use, revise it here
 > and record why in the project's decision log.
 >
-> **Version 0.5.0** (2026-07-21). Deployed as: lean core → `~/.claude/CLAUDE.md`; this
+> **Version 0.5.1** (2026-07-21). Deployed as: lean core → `~/.claude/CLAUDE.md`; this
 > reference → `~/.claude/METHODOLOGY.md`; doc scaffolding → the `init-project-docs` skill;
 > version + changelog + update-check hook → `claude/VERSION`, `claude/CHANGELOG.md`,
 > `claude/hooks/check_version.py`; status line → `claude/statusline.py`; and the **six-step
@@ -145,8 +145,10 @@ act; a plan is a hypothesis, not a promise.
 The invariants above say *what* discipline to keep; this machinery makes it *run* on a task, so it
 doesn't depend on remembering. It is **opt-in, one task at a time** — it wakes only when a
 `.workflow/marker.json` exists in the project you're working in, and only `workflow.py start` creates
-it. No marker, no workflow; quick fixes and throwaway scripts stay untouched. Turn on the ambient
-status-line indicator + nudge once per machine with `python sync.py enable-workflow`.
+it (typically via the **`/start-task "<goal>"`** chat command, which scaffolds any missing docs, runs
+the bootstrap, and opens the Need step — the one human-owned entry the design allows). No marker, no
+workflow; quick fixes and throwaway scripts stay untouched. Turn on the ambient status-line indicator +
+nudge once per machine with `python sync.py enable-workflow`.
 
 ### The six steps
 A task walks six steps; each settles one question and writes its answer into the project's docs, so
