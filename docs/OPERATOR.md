@@ -8,20 +8,31 @@
 ## Why this file exists
 In the first by-hand run of the six-step workflow (M1, 2026-07-13), the catch that reshaped the
 whole task — *"you never edit the live files, so `install` can't overwrite them"* — was a fact
-about how the developer works, and it was written down **nowhere**. The AI challenger starts
-isolated, with no memory of past conversations (that isolation is what gives it fresh eyes), so
-it couldn't see the fact; the human had to supply it by hand, which cost several extra rounds.
-Writing these facts down lets the AI challenger carry that weight next time instead of the human.
+about how the developer works, and it was written down **nowhere**. The AI challenger never sees
+the main chat: no transcript of past conversations, none of the builder's private reasoning — and
+that isolation is exactly what gives it fresh eyes. So it couldn't see the fact; the human had to
+supply it by hand, which cost several extra rounds. Writing these facts down lets the AI challenger
+carry that weight next time instead of the human.
 
-The general rule this taught us: **the AI challenger is only as sharp as the written context it
-is handed.** A challenger subagent inherits none of the main chat's memory, so anything tacit has
-to be on paper and passed in explicitly.
+The general rule this taught us: **the AI challenger is only as sharp as the written context it is
+handed.** It is not a blank slate — the Claude Code runtime injects the global methodology core
+(`~/.claude/CLAUDE.md`), the project's `CLAUDE.md`, and this project's **memory index** (the
+one-line summaries in `MEMORY.md`), ahead of the bundle it is told to read. But a one-line summary
+is a pointer, not the fact behind it. So the bright line holds: **anything tacit that actually
+decides a task has to be written here in full and passed in explicitly** — a summary the challenger
+happens to carry is not enough to settle a call on.
 
 ## Scope
-**Repo-specific** operator facts live here. Global habits — plain-language, one-topic-at-a-time
-communication; the Windows `git push` schannel fix — live in `~/.claude` memory. A challenger
-subagent doesn't inherit that memory either, so if a task turns on a global habit, hand that over
-too.
+**Repo-specific** operator facts live here — and so do my **global** habits (plain-language,
+one-topic-at-a-time communication; the Windows `git push` schannel fix). They reach a challenger
+the same way every line in this file does: **`OPERATOR.md` is a warm source, assembled into the
+challenge bundle.** There is no `~/.claude` *memory* store they live in — only `CLAUDE.md` is
+global. The memory index may *summarize* a habit, but the challenger needs the detail, so **if a
+task turns on a global habit, write the detail here.**
+*(Corrected 2026-07-20, M7: this section stated the platform wrong twice — that a challenger
+inherits no injected memory, and that global habits live in a `~/.claude` memory store. Measured:
+the runtime injects the global + project `CLAUDE.md` and the project memory index; no `~/.claude`
+memory store exists. Getting the harness honest about exactly this is what M7 is.)*
 
 ## Working habits
 - **I edit in the repo, then run `python sync.py install`. I never hand-edit the live `~/.claude`

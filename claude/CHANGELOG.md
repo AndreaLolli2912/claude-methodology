@@ -5,6 +5,22 @@
 > the human-readable changelog. Each release is one `## <semver> — <date>` heading followed
 > by `- ` bullet lines. Newest first. Keep the heading grammar stable — a parser binds to it.
 
+## 0.5.0 — 2026-07-21
+- **The challenge harness stops overclaiming (M7).** The text a *challenger* reads no longer tells it
+  things that are not true: gone are the claims that the challenger "knows only the bundle" and that a cold
+  read is *forced* or *deferred to a later milestone*. The `rulebook.md`, `challenger.md`, and `cmd_prepare`
+  prose now say what the harness actually does — it *surfaces* a cold read for an agent that arrives
+  pre-injected (global + project `CLAUDE.md` + the project memory index), it does not force one. A single
+  canonical block, held consistent across the two shipped copies (and guarded by a cross-file test), tells
+  the challenger the true shape: it starts isolated (no main chat, none of the builder's private reasoning),
+  judges the cold section on its written record, and holds any injected operator memory — habits,
+  preferences, or facts — for the warm pass.
+- **`OPERATOR.md`'s two false platform claims corrected**, and the redundant **`global_habits` warm slot
+  retired** (`warm_sources = ["operator"]`; the `.workflow/.gitignore` `start` writes is now a total ignore).
+- **The orphan `context_hash` receipt field removed** — it hashed a bundle that contained the random canary,
+  so it was unreproducible and read by nothing. A receipt is now `{challenge_ran, artifact_hash, canary}`;
+  the tolerant reader still reads pre-0.5.0 receipts, so no migration is needed.
+
 ## 0.4.0 — 2026-07-17
 - **The six-step adversarial workflow now ships and runs.** The machinery built across M1–M5 (never
   versioned until now) is deployed by `sync.py` and activated per-machine with `python sync.py

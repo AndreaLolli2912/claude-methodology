@@ -237,11 +237,23 @@ check("13d status previews a MISSING entry as REPORT, distinct from HALT (M2)",
       "REPORT" in out and "HALT" not in out)
 sync._git_status = _saved_git
 
-# --- Proof 14: VERSION bumped to 0.4.0 and the CHANGELOG carries a 0.4.0 entry ---------------------
-check("14a claude/VERSION is 0.4.0",
-      (REPO_ROOT / "claude" / "VERSION").read_text(encoding="utf-8").strip() == "0.4.0")
-check("14b claude/CHANGELOG.md has a 0.4.0 entry",
-      "0.4.0" in (REPO_ROOT / "claude" / "CHANGELOG.md").read_text(encoding="utf-8"))
+# --- Proof 14: VERSION is 0.5.0 AND consistent across every shipped site that states a version ---------
+# 14c/14d are M7's addition: the R-1 cross-file-equality discipline applied to the version string. Before
+# them, a partial bump (VERSION updated, a header forgotten) went GREEN and shipped an inconsistent version
+# - M7's own defect class ("the same claim, out of sync across shipped texts"). Now the suite FAILS on it.
+# 14a is the single hand-maintained anchor (a real bump edits this literal); 14b-d derive from it, so they
+# auto-follow the anchor and only fail when another site drifts away from VERSION.
+VER14 = (REPO_ROOT / "claude" / "VERSION").read_text(encoding="utf-8").strip()
+check("14a claude/VERSION is 0.5.0", VER14 == "0.5.0")
+_changelog14 = (REPO_ROOT / "claude" / "CHANGELOG.md").read_text(encoding="utf-8")
+check("14b claude/CHANGELOG.md carries the CURRENT VERSION's entry (not a stale forever-true match)",
+      "## {} ".format(VER14) in _changelog14)
+_claudemd14 = (REPO_ROOT / "claude" / "CLAUDE.md").read_text(encoding="utf-8")
+_method14 = (REPO_ROOT / "claude" / "METHODOLOGY.md").read_text(encoding="utf-8")
+check("14c claude/CLAUDE.md carries v<VERSION> in both the core header and the living-hypothesis line",
+      _claudemd14.count("v" + VER14) >= 2)
+check("14d claude/METHODOLOGY.md's Version line equals VERSION",
+      "Version {}".format(VER14) in _method14)
 
 # --- _copy's own "missing" detector (the TOCTOU primitive), exercised directly, not mocked --------
 _copy_tmp = Path(tempfile.mkdtemp(prefix="wf_copy_")).resolve()

@@ -271,3 +271,36 @@ collaborative checklist, not a solo run.
 observation — and the ones that needed a real session were seen in one.
 **Pointers:** M5 Judgment→Shipping (`OVERVIEW.md` `WF:judgment:796664b9`, `DECISIONS.md` 2026-07-16); the
 live-proof screenshot; the deployed-scripts probe pattern (2026-07).
+
+## Don't let your own verdict overclaim its evidence — a fail-only probe reassures but can't confirm
+**When you need this:** you are judging whether something *works* (a behavioral property, a discipline, an
+instruction that must be followed), and your evidence is an experiment that came out clean. You are tempted
+to headline "measured / proven." Especially acute when the thing being judged is a milestone about honesty
+or overclaiming — the verdict can commit the exact defect it exists to remove (M7's Judgment did: it wrote
+"B1 resolved by measurement" and its own challenger caught the overclaim).
+**The path:**
+1) **Name what your evidence can and cannot establish, before you headline it.** A probe with **no failing
+   arm and no control** can *disconfirm* but never *confirm*: a clean run may just mean the behavior was
+   there anyway. If the *same* pass would occur under the old/wrong version too (M7: 16/16 challengers held
+   discipline under the *false* text), the pass proves nothing about the new version — it is *fail-only*.
+2) **Run the real experiment (rule 8) when a crux turns on a fact about your own thing** — but run it so it
+   *can* vote: faithful channel (the real delivery path, not a proxy), the confound **physically removed**
+   (M7 enforced the cold pass by handing the actor *no* warm section to read ahead to), and n>1. Even then,
+   a clean run is **reassurance, not proof** — say so.
+3) **Watch for self-reported internal state dressed as an outcome.** "The agent said it consciously held the
+   fact out" is introspection, the class neutral-probe designs exist to avoid. Prefer an *observable* result
+   that could only occur under the new instruction and could have come out the other way.
+4) **When the evidence can't confirm, clear the risk as a conscious acceptance, not a measurement.** State
+   the honest position ("strictly more honest, still instructs the behavior, erosion not expected — asserted,
+   not measured") and record it as a named residual with an owner. That is a *different*, weaker clear than
+   "proven," and the human must make it with eyes open.
+**Gotchas:** the trap is pairing "experiment run" with "risk cleared" so it reads as "risk measured away."
+A fail-only probe that doesn't fire leaves the claim exactly as unproven as before — it only rules out a
+gross failure. And beware the method artifact that voids the test entirely (M7: editing the injected memory
+index mid-session didn't reach the subagents at all — the decoy was never delivered; only the channel-check
+tail revealed it).
+**How you know it worked:** the verdict's headline matches what the evidence can bear — "reassured, not
+proven" where a pass can't confirm — and a later reader can't mistake a conscious acceptance for a
+measurement. The adversarial reviewer, turned on the verdict itself, finds no claim dressed beyond its proof.
+**Pointers:** `DECISIONS.md` 2026-07-21 (M7 Judgment — the self-caught overclaim); `.workflow/draft-judgment.md`;
+RISKS #27; the "adversarial reviewer" and "green vs done" recipes above (2026-07).

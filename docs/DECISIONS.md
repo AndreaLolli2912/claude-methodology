@@ -5,6 +5,111 @@
 
 <!-- WF:anchor:decisions-log -->
 
+### 2026-07-21 — M7 Shipping built: the honest harness ships (0.5.0); deploy is the terminal action
+
+**What's built (Shipping's hand-written half — no auto-doc).** Settled over **two Shipping challenge
+rounds**. Round 1 found no blocker but caught **two instances of M7's own defect class in the ship plan
+itself**: the VERSION lockstep was guarded by a hand-count that was *already wrong* (said "five sites",
+listed four) with **no test of cross-file version consistency**, and the rollback was labelled "shown" while
+only *described* — an overclaim in the anti-overclaim milestone. Both folded (round 2), plus a `git status`
+pre-flight blind to git-ignored scratch, a cwd-sensitive `reset`, a backwards rollback order, and a
+payload-only version scope.
+
+**The build.** VERSION **0.4.0 → 0.5.0** across all sites (`VERSION`, `CLAUDE.md`×2, `METHODOLOGY.md`,
+`CHANGELOG`), plus a **cross-file version-consistency test** (`test_sync_bundle` 14c/14d) — the R-1
+cross-file-equality discipline applied to the version string, so a *partial* bump now **fails the suite**
+instead of shipping inconsistent (guarding the exact class round 1 caught). CHANGELOG 0.5.0 entry; **RISKS
+#27–#32** (added-instruction reassured-not-proven, runtime two-faces, bounded review, post-deploy/cross-repo
+live check + the mid-session-injection method finding, R-4 + warm-drift deferrals) and fixes to the stale
+forward-refs in **#24** (re-deferred past M7) and **#25** (M7 edited the interior → walk-faithful pre-flight,
+not `git status`); a **PLAYBOOK** recipe (*don't let your own verdict overclaim its evidence — a fail-only
+probe reassures but can't confirm*); a `docs/` version sweep (one current-state fix at `OVERVIEW.md:33`, the
+rest historical).
+
+**Proof (T2).** Full suite **258 → 260** (the +2 are the consistency checks). **Walk-faithful pre-flight
+clean:** zero git-ignored files and zero scratch artifacts under `claude/` — the install walk would ship
+exactly the intended payload.
+
+**The terminal action (separate operator go).** Confirm the root (cwd-safe, the environment persists a
+stray `cd`) → `reset` (ends the task) → `sync.py install` — which **lifts the 0.4.0 pin** and deploys the
+honest text to `~/.claude` (every repo). Rollback: the operator's daily `git checkout 63984a2 -- claude/` +
+re-`install`. Then the **live-after-close** check (owner: operator, first post-`reset` task; a decoy
+re-probe needs a fresh session). Committed as a checkpoint **before** the deploy so the rollback has a clean
+commit to return to.
+
+### 2026-07-21 — M7 Judgment settled: GO on honest ground (four rounds; the harness caught itself)
+
+**What settled.** M7-as-implemented meets its trimmed Need — **GO**. Settled over **four adversarial
+Judgment rounds** and advanced by a **recorded override** (`advance --force`): the round-4 honest reframe
+was folded after the round-3 record, staling the receipt, and the operator chose to skip a fifth round.
+(Auto-publish to OVERVIEW status was therefore blocked — `publish` has no `--force` — so this DECISIONS
+entry is the settlement's durable home, as with Design/Architecture. The full verdict lives in
+`.workflow/draft-judgment.md`.)
+
+**The verdict rests on two separately-judged claims.** (1) **Deleting the four false strings is
+unconditionally justified** (the lie is gone, verified by absence tests — no efficacy evidence needed).
+(2) The **added instruction** (injected core = cold standard; injected memory held for warm) is the
+**necessary content of the honest replacement** — you cannot delete *"the bundle is all you get"* and say
+nothing, since the challenger *does* receive injected context — and its cold-discipline is **reassured but
+not proven**: a **conscious acceptance** (R12-M4), not a measured result.
+
+**The four rounds — and why the loop earned its keep.** R1: four evidence gaps folded (the Axis-2
+replacement prose actually read against "reads true"). R2: a blocker — the central claim had no *confirming*
+signal — triggered a **rule-8 experiment** (n=3 neutral challengers, reframed rulebook, a decisive fact
+delivered via the **real runtime memory-index injection**, cold-pass **physically enforced**, exercising
+this repo's own leak-path fact *"plugins can't deliver the always-on core"* against a record silent on it —
+**none imported it into cold**). R3 then **caught the round-3 verdict overclaiming that experiment**
+("resolved by measurement"): a pass is what the *old false* text already produced 16/16, the run had no
+control/failing arm, and its only distinguishing evidence was self-report. **That overclaim was M7's own
+defect — the harness overclaiming its own evidence — committed in M7's own Judgment and caught by M7's own
+challenger.** R4 folded the honest correction: the experiment is a **more-rigorous fail-only smoke test that
+did not fire** (reassuring, and it tested the live leak-path + found that mid-session `MEMORY.md` edits don't
+reach subagents) — **not proof**, as the Design always held.
+
+**Other evidence.** Suite **250 → 258** green (new R-1 presence/equality/absence + seam + `context_hash`
+checks — *presence, not efficacy*); sweeps clean (zero live traces in the payload); the mandatory **seam
+eyeball** performed and attested; `OPERATOR.md`'s platform claims independently checked against the measured
+injection facts; **`draft-need.md` reconciled** to the trimmed scope — a RISKS #15 slip (a correction that
+lived only in the published Need block, not the draft the next challenger reads) that the Judgment itself
+caught.
+
+**Consciously cleared (rule 4), → RISKS at Shipping.** **B1**: added-instruction discipline is
+reassured-not-proven (direction-b "use core as standard" untested, its worst case — a stale pinned core as
+authority — live in *this* repo; evidence is a proxy agent, effective n=3, cold-arm only). **C1**: the only
+live-runtime check is post-`reset`, so the changed `challenger.md` deploys everywhere before any probe and
+the probe covers only this repo — **imminent, not theoretical** (2–3 repos/day). **Scope honesty:** the
+Need's problem #2 (warm-drift unreported) gets only the `context_hash` deletion — the drift problem is
+deferred, so M7 **half-meets** its originally-stated Need, by conscious design.
+
+**Next — Shipping:** hand-write RISKS / PLAYBOOK / CHANGELOG (record B1 + C1 + the method finding), bump
+VERSION, then `reset` + `sync.py install` — which lifts the 0.4.0 pin and deploys the honest text.
+
+### 2026-07-21 — M7 Implementation complete: the honest core ships (change-map executed)
+
+**What changed.** Executed the settled change-map (`.workflow/draft-architecture.md`), E→A→B→C→D,
+editing shipped text only (no new component): R-1 canonical block at `rulebook.md`/`challenger.md`
+(+ rule-6 / :27 clause-fixes), asserted normalized-equal across the two shipped copies; Axis-2
+docstring + WORKFLOW.md de-staled; the orphan `context_hash` receipt field deleted; `OPERATOR.md`'s
+two false platform claims corrected (operator-authored); `global_habits` **fully retired** (9
+`workflow.py` sites → zero live traces, `.gitignore` now `*`); 3 R-1 tests + seam + context_hash-absence
+added, `test_rooting` R2/R7 reworked.
+
+**Decisions in-flight** (operator-approved): the context_hash-absence test is **behavioral** (asserts a
+live receipt lacks the field, so it is comment-robust); the pre-existing `test_rooting` R2-stderr failure
+(a Windows 8.3 short-name mismatch, failing identically at HEAD `63984a2`) fixed by comparing the
+**resolved** path; the M7 **Need block was pre-trim** (it described the round-11-deferred R-2 warm-drift +
+R-4 as shipped) → a scope-note caveat was added and the proof bar reconciled to the trimmed scope.
+
+**Proof (T2), re-verified fresh at seal.** Full suite **258/258** across 10 files (was 250 — the growth is
+the new checks). Sweeps clean: the `context_hash` / `global_habits` / "deferred to M4" classes survive only
+in historical LEAVEs (`docs/` Need + records) and the test guards — **zero in the shipped `claude/` payload**.
+`workflow.py` imports and runs. The **deployed** `workflow.py` stayed **0.4.0** the whole run (RISKS #19) —
+verified: the deployed `rulebook.md`/`challenger.md` still carry the OLD over-claim, so no `install` leaked
+the edits; the honest text goes live only at Shipping.
+
+**Advanced** implementation→judgment via `advance --force` — Implementation is the RECIPE's deferred
+exception (no prose challenge, so it earns no receipt), so the gate is overridden on the record.
+
 ### 2026-07-20 — M7 Architecture settled: the file-level change-map (four adversarial rounds)
 
 **What settled.** M7's Architecture — the WHERE for the settled Design — is a **file-level change-map** (no new

@@ -10,8 +10,9 @@ because BUNDLE and PROJECT came apart and PROJECT paths became functions of a re
     duplicate when a marker already sits above.
   * the resolved root prints to STDERR (human ruling, 2026-07-16), so STDOUT stays exactly what
     callers and the other 124 checks parse.
-  * D-10: `start` authors a self-ignoring .workflow/.gitignore, proven with REAL git - the
-    hand-authored global-habits.md stages, but the marker, the drafts and .gitignore itself do not.
+  * D-10: `start` authors a self-ignoring .workflow/.gitignore, proven with REAL git - a
+    `git add -A` stages NOTHING from .workflow/: the marker, the drafts, a hand-authored file,
+    and .gitignore itself all stay ignored (`*` is total; M7 retired the lone re-include).
 
 Standalone script (like every suite here): it sys.exit()s at the end, so run it DIRECTLY -
 `python tests/workflow/test_rooting.py` - never under pytest.
@@ -70,9 +71,9 @@ REPO.mkdir()
 rc, out, err = run("start", "rooting task", cwd=REPO)
 check("R2 start succeeds inside a git repo", rc == 0)
 check("R2 marker created at the repo root", (REPO / ".workflow" / "marker.json").exists())
-check("R2 start authored .workflow/.gitignore verbatim (* then !global-habits.md, no !.gitignore)",
-      (REPO / ".workflow" / ".gitignore").read_text(encoding="utf-8") == "*\n!global-habits.md\n")
-check("R2 resolved root printed to STDERR", "workflow: root" in err and str(REPO) in err)
+check("R2 start authored .workflow/.gitignore verbatim (* only, no !.gitignore)",
+      (REPO / ".workflow" / ".gitignore").read_text(encoding="utf-8") == "*\n")
+check("R2 resolved root printed to STDERR", "workflow: root" in err and str(REPO.resolve()) in err)
 check("R2 STDOUT carries no root line (the 124 stdout assertions stay untouched)",
       "workflow: root" not in out)
 
@@ -107,23 +108,25 @@ check("R6 status with no task is inert (exit 0)", rc == 0 and "no task open" in 
 
 # ---------------------------------------------------------------------------
 # R7. D-10, proven with REAL git (proof #4 - asserted, not inspected): after `start` authors
-# .workflow/.gitignore, a `git add -A` stages ONLY the hand-authored global-habits.md; the
-# marker, a draft, and .gitignore itself stay ignored. This is the whole point of the rule -
-# `git add -A` is safe in ANY repo by construction, with no repo-level entry.
+# .workflow/.gitignore (`*`, no re-includes), a `git add -A` stages NOTHING from .workflow/ -
+# the marker, a draft, AND a hand-authored file all stay ignored. This is the whole point of
+# the rule - `git add -A` is safe in ANY repo by construction, with no repo-level entry. (M7
+# retired the lone re-include along with the warm slot it served, so `*` is now total: a
+# strictly simpler, safer invariant than the old "all ignored except one".)
 # ---------------------------------------------------------------------------
 GITREPO = TMP / "gitproof"
 GITREPO.mkdir()
 subprocess.run(["git", "init", "-q"], cwd=str(GITREPO), check=True)
 rc, out, err = run("start", "git proof", cwd=GITREPO)
 check("R7 start succeeds in a real git repo", rc == 0)
-# The one re-included file (hand-authored) plus two files the `*` must keep ignored.
-(GITREPO / ".workflow" / "global-habits.md").write_text("my habits\n", encoding="utf-8")
+# A hand-authored file, a draft, and the marker - the `*` must keep ALL of them ignored.
+(GITREPO / ".workflow" / "notes.md").write_text("a hand-authored file\n", encoding="utf-8")
 (GITREPO / ".workflow" / "draft-need.md").write_text("a draft\n", encoding="utf-8")
 subprocess.run(["git", "add", "-A"], cwd=str(GITREPO), check=True)
 staged = subprocess.run(["git", "diff", "--cached", "--name-only"],
                         cwd=str(GITREPO), capture_output=True, text=True).stdout
-check("R7 global-habits.md IS staged (the single re-include)",
-      ".workflow/global-habits.md" in staged)
+check("R7 a hand-authored .workflow file is NOT staged (`*` is total, no re-include)",
+      ".workflow/notes.md" not in staged)
 check("R7 marker.json is NOT staged", ".workflow/marker.json" not in staged)
 check("R7 a draft is NOT staged", ".workflow/draft-need.md" not in staged)
 check("R7 .gitignore itself is NOT staged (no !.gitignore line)",

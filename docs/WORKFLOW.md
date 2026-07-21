@@ -400,8 +400,10 @@ system is built by its own rules. **Each item is a fresh conversation that reads
     rulebook + COLD + canary + WARM into one file, and **the canary sits near the end of COLD**, so any read
     that reaches it also delivers WARM. Every challenger across M5's eleven rounds reported holding the two
     passes apart *by discipline, not by the harness*. `cmd_prepare`'s own docstring concedes it *surfaces*
-    rather than *forces* a cold read. The fix reopens the bundle format (two files, or a canary that lands
-    before COLD ends). `workflow.py:387` still says "deferred to M4", a shipped milestone.
+    rather than *forces* a cold read. **M7's fix is honesty, not forcing:** instead of reopening the bundle
+    format (two files, or a canary before COLD ends), it corrects every text that *claimed* a forced or
+    isolated cold read, so nothing now overstates what `prepare` does. A real forced cold read stays unbuilt;
+    the honest-but-unforced tradeoff is M7's accepted cost.
   - **RISKS #15** — later steps challenge a record lacking every earlier correction. Re-homed here from M5,
     where it sat by date rather than subject. Same theme: what the challenger is shown.
   - **RISKS #18** — the canary proves a bundle was *read*, not *fresh*. Same theme again; M5's rooting fix

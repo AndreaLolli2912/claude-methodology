@@ -114,10 +114,9 @@ touched or relied upon.
 `.workflow/marker.json`, whose sole writer is `workflow.py`:
 - `task_id`, `task_title` — which task this is.
 - `current_step` — one of need / design / architecture / implementation / judgment / shipping.
-- `receipts` — one per finished step; each holds `challenge_ran`, `context_hash` (the bundle
-  handed to the challenger), `artifact_hash` (the step's product), and `pending_canary` (the
-  secret token planted for the in-flight challenge, so a later `record` run — a *separate*
-  process that shares nothing but this file — can check the echo).
+- `receipts` — one per finished step; each holds `challenge_ran`, `artifact_hash` (the step's
+  product), and `canary` (the secret token planted for the in-flight challenge, so a later
+  `record` run — a *separate* process that shares nothing but this file — can check the echo).
 - an `override` mark on a step — set when the human consciously advanced past the gate.
 
 We deliberately do *not* store a "draft/settled" flag: that state is derivable (a step is settled
@@ -234,9 +233,8 @@ more than one pair for the key → **refuse** (never guess into a malformed doc)
 **The contracts (P5) the Need slice adds:**
 - `.workflow/context.md` (written by `prepare`, implements α-1): `[rulebook header] [two-pass instruction:
   cold verdict first] [attack angles]` then a delimited **COLD** section (canary token + the artifact +
-  the settled docs) and a **WARM** section (`OPERATOR.md` + the usually-empty global-habits slot). One
-  bundle, cold+warm visible and ordered — honest *surfacing*, not *forcing*. `context_hash` is over the
-  file's raw bytes (M2).
+  the settled docs) and a **WARM** section (`OPERATOR.md`). One
+  bundle, cold+warm visible and ordered — honest *surfacing*, not *forcing*.
 - `.workflow/challenge.md` (written by the challenger, read by `record`): `## COLD verdict` (echoes the
   canary + ranked findings) then `## WARM verdict`. `record` needs only "a result exists + canary echoed";
   the ranked findings are human-facing. The canary proves the context was **read**, not that both passes
@@ -369,7 +367,7 @@ which is what let the user boundary be tested without touching the real config.
 + `conductor.md`, correctly `__file__`-relative, they ship together) and **`PROJECT`** (the
 `.workflow/` and docs, which `__file__` never should have located). Every `PROJECT` path
 becomes a *function of a resolved root* — `wf_dir(root)`, `marker_path(root)`,
-`draft_path(root, step)`, `gitignore_path(root)`, `global_habits_path(root)` — and readers
+`draft_path(root, step)`, `gitignore_path(root)` — and readers
 gain `root=None`. `root=None` resolves by the *marker* walk-up and exists **only** for a
 human or model at a CLI; every programmatic caller (hooks and the test suite) passes a
 resolved root explicitly, or it re-enters the defect. `start` alone resolves by the `.git`
@@ -403,9 +401,9 @@ the repo root would delete the live marker and its gitignored drafts.
 The nudge's quiet-hash keeps D-5's shape: `.workflow/nudge-state.json`, keyed by
 `session_id`, atomic-written (never torn); the rare concurrent-session lost-update is a
 recorded benign residual (one duplicate nudge), not engineered away. All task state lives
-in a self-ignoring `.workflow/` (`start` writes its `.gitignore`: `*` + `!global-habits.md`),
+in a self-ignoring `.workflow/` (`start` writes its `.gitignore`: `*`),
 so `git add -A` is safe in any repo by construction; `reset` clears the drafts and
-`nudge-state.json` and spares `global-habits.md`. `sync.py` ships six named files and gains
+`nudge-state.json` and spares `.gitignore`. `sync.py` ships six named files and gains
 `enable-workflow`/`disable-workflow` (per-piece), writing only the user `~/.claude/settings.json`
 (outside MANIFEST, so `install` never reverts it and `capture` never commits it). Two write
 idioms, never mirrored — hooks *append* (a collection; `check_version.py` co-exists on

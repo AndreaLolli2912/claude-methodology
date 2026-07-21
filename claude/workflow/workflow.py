@@ -99,12 +99,6 @@ def gitignore_path(root):
     return wf_dir(root) / ".gitignore"
 
 
-def global_habits_path(root):
-    """The hand-filled global-habits slot (usually empty) - a WARM context input, not machine
-    output, so `reset` spares it (D-10)."""
-    return wf_dir(root) / "global-habits.md"
-
-
 def draft_path(root, step):
     """The file that IS this step's product - the draft under attack, hashed for freshness.
     Named `draft-<step>.md` (NOT `<step>.md`) on purpose: on a case-insensitive filesystem
@@ -181,18 +175,17 @@ def _project_root(root):
 #   "artifact"      -> this step's own draft (the thing under attack)
 #   "prior_settled" -> the artifacts of every step before this one
 #   "operator"      -> docs/OPERATOR.md (how this developer actually works)
-#   "global_habits" -> the hand-filled global-habits slot (usually empty)
 # ---------------------------------------------------------------------------
 
 # The FROZEN challenge-context sources, shared by every review-style step. Defined
 # once and referenced by each row below, so "frozen contract" is structural (there
 # is a single definition to read) rather than a copy-paste discipline that can rot.
 # COLD = the step's own draft + all prior settled drafts (fresh-eyes read); WARM =
-# the operator facts + the global-habits slot (habit/domain-specific pass). What
+# the operator facts (habit/domain-specific pass). What
 # each token RESOLVES to is step-position-aware (see _resolve_sources), so the same
 # two lists produce the right per-step context without varying the data.
 _REVIEW_COLD_SOURCES = ["artifact", "prior_settled"]
-_REVIEW_WARM_SOURCES = ["operator", "global_habits"]
+_REVIEW_WARM_SOURCES = ["operator"]
 
 RECIPE = {
     "need": {
@@ -316,8 +309,8 @@ def sha256_bytes(path):
 def _read_if_present(path):
     """Return a file's text if it exists and has non-whitespace content, else ''.
     Lets `prepare` skip absent/empty context sources cleanly - an empty OPERATOR.md
-    or an unfilled global-habits slot simply doesn't appear in the bundle. A decode
-    error is treated as 'not present' rather than crashing the whole assembly."""
+    simply doesn't appear in the bundle. A decode error is treated as 'not present'
+    rather than crashing the whole assembly."""
     try:
         text = path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
@@ -467,8 +460,6 @@ def _resolve_sources(tokens, step, root):
                 pairs.append(("settled record: {}".format(prior), draft_path(root, prior)))
         elif tok == "operator":
             pairs.append(("operator context (how this developer actually works)", Path(root) / "docs" / "OPERATOR.md"))
-        elif tok == "global_habits":
-            pairs.append(("global-habits slot (hand-filled; usually empty)", global_habits_path(root)))
         else:
             raise KeyError("unknown recipe source token: {!r}".format(tok))
     return pairs
@@ -493,12 +484,11 @@ def _append_sources(out, tokens, step, root):
 # The verbs.
 # ---------------------------------------------------------------------------
 def _write_gitignore(root):
-    """D-10: author .workflow/.gitignore = `*` then `!global-habits.md`. The `*` ignores ALL
-    task state (marker, drafts, context, challenge, entry, nudge-state) AND this .gitignore
-    itself; the single re-include exempts the hand-authored global-habits.md. There is NO
-    `!.gitignore` line ON PURPOSE: adding it would make `start` author a git-TRACKED file in
-    every repo it runs in (D-10 tested this twice), which is exactly what we are avoiding."""
-    _atomic_write_text(gitignore_path(root), "*\n!global-habits.md\n")
+    """D-10: author .workflow/.gitignore = `*`. The `*` ignores ALL task state (marker, drafts,
+    context, challenge, entry, nudge-state) AND this .gitignore itself. There is NO `!.gitignore`
+    line ON PURPOSE: adding it would make `start` author a git-TRACKED file in every repo it runs
+    in (D-10 tested this twice), which is exactly what we are avoiding."""
+    _atomic_write_text(gitignore_path(root), "*\n")
 
 
 def cmd_start(args):
@@ -551,8 +541,8 @@ def cmd_prepare(args):
     rulebook as a framing header (Decision A-1), then delivers the context in the
     ordered COLD -> WARM shape the Design settled (alpha-1): the challenger reads and
     verdicts the COLD set first, echoing the canary, then reads WARM. This *surfaces*
-    whether a genuine cold read happened; it does not *force* one (forcing is deferred
-    to M4). The canary cannot prove an INDEPENDENT party read the bundle (the model can
+    whether a genuine cold read happened; it does not *force* one — and nothing downstream
+    forces one either. The canary cannot prove an INDEPENDENT party read the bundle (the model can
     read the file too - the accepted permanent ceiling), but it DOES catch an honest
     mistake: a challenge run against the wrong or truncated bundle echoes the wrong
     token and gets rejected at `record`."""
@@ -608,7 +598,7 @@ def cmd_prepare(args):
     _append_sources(out, recipe["cold_sources"], step, root)
     out.append("\nCANARY (echo this token verbatim in your COLD verdict): {}\n".format(canary))
 
-    # WARM: operator + global habits. Delivered in the same bundle (alpha-1) but ordered
+    # WARM: operator context. Delivered in the same bundle (alpha-1) but ordered
     # after the cold canary and labelled "read only after the cold verdict".
     out.append("\n===== WARM (read only AFTER writing the cold verdict) =====\n")
     if not _append_sources(out, recipe["warm_sources"], step, root):
@@ -654,7 +644,6 @@ def cmd_prepare(args):
     marker["pending"] = {
         "step": step,
         "canary": canary,
-        "context_hash": hashlib.sha256(bundle.encode("utf-8")).hexdigest(),
         # Snapshot the artifact the challenger will actually see. `record` refuses if
         # the live artifact no longer matches this - closing the window where the draft
         # is edited AFTER the challenge but BEFORE record, which would otherwise mint a
@@ -729,7 +718,6 @@ def cmd_record(args):
 
     marker.setdefault("receipts", {})[step] = {
         "challenge_ran": True,           # self-reported: "the model reports it ran" - never "verified"
-        "context_hash": pending["context_hash"],
         "artifact_hash": artifact_hash,  # freshness is keyed to the artifact's live bytes
         "canary": pending["canary"],
     }
@@ -1144,10 +1132,9 @@ def cmd_reset(args):
 
     D-10 widened WHAT is cleared: the drafts now live in .workflow/ (so each draft-<step>.md
     is task output that dies with reset), and the M5 nudge's quiet-hash (nudge-state.json) dies
-    too. Two files are SPARED on purpose: global-habits.md (a hand-authored WARM input, not
-    machine output) and .gitignore (`start` owns it; it must persist so .workflow/ stays
-    self-ignoring even after a reset). Still a FIXED list, not a glob - the single-file
-    quiet-hash is what keeps it enumerable.
+    too. One file is SPARED on purpose: .gitignore (`start` owns it; it must persist so
+    .workflow/ stays self-ignoring even after a reset). Still a FIXED list, not a glob - the
+    single-file quiet-hash is what keeps it enumerable.
 
     A file that is already gone is the intended, benign case; a file that EXISTS but
     cannot be deleted (e.g. locked by an editor or a OneDrive sync) is a real failure

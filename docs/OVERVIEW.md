@@ -30,8 +30,8 @@ every machine in sync through git.
 | 1 | Windows bundle: core + methodology + `init-project-docs` skill, install/capture scripts | Done (v0.1) |
 | 2 | Git-based sync as the primary multi-machine flow (clone → pull → install; capture → commit → push) | In use; may automate |
 | 3 | Cross-platform support — one `sync.py` runs install & capture on Windows/macOS/Linux | Done |
-| 4 | Grow the bundle (more skills/agents) as the methodology matures | In progress (v0.4.0: bundle now ships `agents/`, `hooks/`, `workflow/` alongside `skills/`) |
-| 5 | Active adversarial workflow (six steps + a challenger) that makes the rules *run* | Building — **M1–M6 complete**: the workflow is built, **deployed (v0.4.0)**, and **fires on its own** (workflow-aware status line + nudge + the D-2 rooting fix, live in `~/.claude`); M6 shipped the directory-whitelist transport. **M7 (harness honesty) in progress — Need, Design & Architecture settled** (Architecture through 4 challenge rounds, 2026-07-20); **Implementation next**. Later milestones remain (`docs/WORKFLOW.md`) |
+| 4 | Grow the bundle (more skills/agents) as the methodology matures | In progress (bundle ships `agents/`, `hooks/`, `workflow/` alongside `skills/` since v0.4.0) |
+| 5 | Active adversarial workflow (six steps + a challenger) that makes the rules *run* | Building — **M1–M6 complete**: the workflow is built, **deployed (v0.4.0)**, and **fires on its own** (workflow-aware status line + nudge + the D-2 rooting fix, live in `~/.claude`); M6 shipped the directory-whitelist transport. **M7 (harness honesty) — Implementation done + Judgment settled GO** (2026-07-21, through 4 Judgment rounds; the harness caught its own verdict overclaiming — see DECISIONS); **Shipping next** (hand-write RISKS/PLAYBOOK/CHANGELOG, bump VERSION, `reset` + `install` to lift the 0.4.0 pin). Later milestones remain (`docs/WORKFLOW.md`) |
 
 ## Current status
 
@@ -57,10 +57,15 @@ thing that is.**
    holding the two passes apart *by discipline, not by the harness* — because the contamination
    arrives by injection, ahead of the bundle, so no bundle shape reaches it.
 2. *Warm-source drift is unreported (RISKS #18).* `record` re-hashes the artifact and refuses a
-   change; warm sources get no equivalent. (A whole-bundle `context_hash` is written to every
-   receipt at `workflow.py:657` and **never verified** — infrastructure R-2 can reuse.)
+   change; warm sources get no equivalent. (A whole-bundle `context_hash` was written to every
+   receipt and **never verified**; R-2 removes it.)
 
 **Settled decisions:**
+> **Scope note (round-11 trim, Design — 2026-07-20).** Two of the decisions below were later
+> **deferred**: R-2's *warm-drift detection* (R-2 was reduced to the `context_hash` cleanup) and
+> **R-4** (the wrong-copy warning). The bullets stand as the **original** settled Need; the trim
+> and its rationale live in DECISIONS ("M7 Design settled", 2026-07-20) and the deferred hazards in
+> RISKS. **M7 ships R-1, the `context_hash` deletion, and R-3.**
 - **The two-pass is an honest convention, not an enforced gate.** M7 does *not* split the bundle.
   A cold read cannot be forced against an agent that arrives pre-injected and holds `Read` — the
   same blacklist shape (*a claim about the complement of a set we don't control*) that failed
@@ -115,14 +120,13 @@ only after `reset` closes the task. This is discipline, not construction (RISKS 
 the one part that is construction — covering the route discipline was never going to reach.
 
 **Proof bar (T2):** by **search** — no in-scope shipped text claims the challenger knows only the
-bundle or that a cold read is forced (reported "N of N"). By **test** — warm drift lands in the
-receipt *and* on stderr with honest wording; an untouched source reports nothing; R-4 warns from a
-non-deployed copy on a live marker and stays silent with no marker; the artifact and canary gates
-still refuse; **all 250 checks stay green, unchanged** (no bundle change means
-`test_workflow.py:119-133`'s ordering assertion now stands as a regression test). By
-**review** — `global_habits` has a recorded keep/change/retire decision. **Live, after close** — a
-fresh post-`reset` task's `prepare`/`record` behave and the drift report + guard fire in a real
-session (owner: the operator, first task after M7).
+bundle or that a cold read is forced (reported "N of N"). By **test** — the R-1 block ships
+present, cross-file-equal, and the old over-claims absent (`test_workflow.py`); `context_hash` is
+written to no receipt; the artifact and canary gates still refuse; **the suite stays green; the
+count grows** (currently 258/258; no bundle change means the ordering assertion now stands as a
+regression test). By **review** — `global_habits` is retired, and `OPERATOR.md` reads true against
+the measured injection facts. **Live, after close** — a fresh post-`reset` task's `prepare`/`record`
+behave with no `context_hash` (owner: the operator, first task after M7).
 <!-- WF:need:b86710c6:end -->
 
 <!-- WF:judgment:b9a87ab6:start -->

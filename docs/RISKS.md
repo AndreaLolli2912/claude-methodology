@@ -247,7 +247,7 @@ operator with git and per-write backups; revisit with an atomic replace if setti
 programmatic.
 
 **#22 — `.workflow/.gitignore` has no self-heal (accepted at M5).** `start` writes `.workflow/.gitignore`
-(`*` + `!global-habits.md`) once, so a task's transient state (marker, drafts, nudge-state) stays untracked. If
+(`*`) once, so a task's transient state (marker, drafts, nudge-state) stays untracked. If
 that file is deleted mid-task those files become stageable again — but the gap shows in `git status` before any
 commit, and the next `start` re-creates it. Single-user, low-stakes; recorded, not guarded.
 
@@ -263,8 +263,10 @@ asked to "turn off the flow," a fresh context-free Claude went to hand-edit `~/.
 carry no pointer to their own clean removal, so an agent asked to disable them improvises on global settings —
 risking a partial disable (a dropped `check_version`, malformed JSON). Contained today by the permission prompt
 the edit must pass and the `settings.json` backups, but a real discoverability gap: a one-line "to turn this
-off, run `sync.py disable-workflow all`" in the conductor slice or a `sync.py` hint would close it. Deferred to
-M7 with the other harness-honesty items.
+off, run `sync.py disable-workflow all`" in the conductor slice or a `sync.py` hint would close it. **Re-deferred
+past M7 (updated 2026-07-21):** M7's round-11 trim scoped the skip-warner / off-switch **out** (its mechanism
+was found defective, not merely thin), so M7 did not close this; revisit at the next milestone touching the
+deploy/control layer.
 
 **#25 — interior churn ships silently (accepted at M6).** The directory-whitelist gate
 (`_definition_problems`) classifies only the *top-level* entries under `claude/`; everything deeper is inside
@@ -278,7 +280,11 @@ And a richer interior *report* stays open as a future option (it is a whitelist 
 ship" — not the rejected blacklist); only interior *gating* was ruled out. For M6 itself the exposure is low
 (its churn is in `sync.py` at the repo root + the named root docs, so its scratch files land at the top level
 and are caught as strays). The question sharpens at **M7+**, when the shipped `claude/workflow/` machinery is
-edited again.
+edited again. **M7 did edit it** (`workflow.py`, `rulebook.md`, `challenger.md`), so M7 Shipping
+(2026-07-21) honored this with a **walk-faithful pre-flight clean-check** — enumerate what the *install
+walk* will ship from `claude/{skills,agents,hooks,workflow}/` and confirm it is exactly the intended
+payload. `git status` is the *wrong* detector: a git-ignored editor/scratch artifact whose pattern is not
+in `sync.py`'s `IGNORE` passes git clean and still ships (see #26).
 
 **#26 — a gitignored file inside a named dir ships (accepted at M6, personal use).** M6's Design explored
 deriving the ship set from `git ls-files` and **rejected** it (it needed a git checkout, broke the
@@ -288,3 +294,49 @@ secret, a local-only note — would deploy. Accepted as low-harm **today**: the 
 `~/.claude`, `claude/` is a curated mirror not a scratch space, and there is no public audience. It is flagged
 as **the first thing the deferred sharing milestone must revisit** (Need §4 / A1), because the blast radius
 changes the day the bundle is shared. See DECISIONS 2026-07-17 (M6 Design — the git-as-source rejection).
+
+**#27 — R-1's added instruction is reassured, not proven (accepted at M7, 2026-07-21).** M7's honest
+replacement for "the bundle is all you get" newly instructs the challenger to *use the injected methodology
+core as the cold standard, but hold injected memory (habits, preferences, or facts) for the warm pass.*
+That is the milestone's central behavioral claim, and its cold-discipline is supported only by a **fail-only**
+probe: a rule-8 experiment (n=3, faithful runtime injection, cold-pass physically enforced, exercising this
+repo's real leak-path fact) did not fire, but a pass is *expected regardless* (challengers held discipline
+even under the old false text, 16/16) — so it can disconfirm, never confirm. The evidence is also a **proxy
+agent** (not the shipped `challenger.md`) and **cold-arm only**: direction (b), "use the core as the
+standard," is untested, and its worst case — the injected, pinned core being a *prior version of the very
+document under change* (a live edge in this methodology repo, #28) — is trusted to the challenger's
+judgement, not mechanized. Consciously accepted (the honest position: strictly more honest than the deleted
+lie, still instructs hold-out, erosion not expected — *asserted, not measured*). The milestone's thinnest T2 corner.
+
+**#28 — the honest block's standard is a runtime-injection dependency, two faces (accepted at M7).** The
+canonical block is **presence-guarded** — it asserts nothing about what the runtime injects, so no clause
+goes *false* if injection stops (only "to the extent you carry the core" becomes a vacuous conditional). But
+the standard it names is **variable**: because the clause is conditional on what a challenger *carries*,
+different runtimes/versions judge the same proposal against different amounts of injected methodology core.
+Accepted: a varying-but-honest standard beats the fixed-but-false "the bundle is all you get."
+
+**#29 — Axis-1 completeness is a bounded, single-party semantic review (accepted at M7).** The absence tests
+guard four *known* deleted strings + the A2 seam; a *novel* over-claim in the block's connective middle (the
+class the milestone re-introduced 3+ times, always in new words) is caught only by the bounded closed-set
+review + the manual seam eyeball + the challenger loop (which reached 4 rounds at Judgment). No complete
+automated guard exists — a full one would be the forbidden open blacklist. Bounded, not closed.
+
+**#30 — the honest text's only live check is post-deploy and covers one repo (accepted at M7).** The
+"live-after-close" probe (first post-`reset` task: `prepare`/`record` behave with no `context_hash`, the
+`global_habits` retire holds, and a fresh-session decoy re-probe) runs *after* `install` deploys the changed
+`challenger.md` to **every** repo, and only in *this* repo. Cross-repo exposure is unobserved and — the
+operator works 2–3 repos/day — **imminent, not theoretical**, though his current near-exclusive focus here
+is an informal detect-before-spread window. **Method finding (2026-07-21):** editing `MEMORY.md` mid-session
+does **not** reach spawned subagents (they receive the session-start snapshot), so a live decoy re-probe of a
+*new* fact needs a fresh session. No pre-ship close is possible (we cannot probe future runtimes).
+
+**#31 — the wrong-copy warning (R-4) is deferred (trimmed at M7 round 11).** A task driven by a non-deployed
+`workflow.py` copy is unwarned; `_print_root` surfaces a wrong *root* (the usual cwd-drift symptom) but not a
+wrong *copy* with the right root. The proposed start-copy proxy missed the common case and could not be
+dogfooded; deferred as a defective mechanism, hazard recorded. Revisit on a witnessed copy-mismatch or a
+non-nagging deployed-location design.
+
+**#32 — warm-source drift detection (R-2's dropped half) is deferred (trimmed at M7 round 11).** `record`
+re-hashes the artifact and refuses a change; a warm source gets no equivalent. The only design so far fires
+on the common **edit-then-record** order (alarm fatigue → self-defeating) and triggers outside the observed
+workflow. Revisit with a witnessed incidental-race need and a response-edit-safe design.
