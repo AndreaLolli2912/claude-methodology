@@ -37,6 +37,36 @@ every machine in sync through git.
 
 <!-- WF:anchor:current-status -->
 
+<!-- WF:need:c9887ef5:start -->
+**Writing-style rules in the always-on core · Need settled (2026-07-21, task `c9887ef5`).**
+Ran through the workflow over three challenge rounds; the operator settled each call.
+
+**The need.** The methodology steers *how work runs* but carried no general writing-style layer
+(only D2 for comments, R3 for questions). The operator wanted one durable style — clear, plain,
+active, non-robotic — applied every session and every project, "without forgetting the rest of the
+workflow."
+
+**Settled.**
+- **A 21-rule block ships in `claude/CLAUDE.md`** (Strunk & White-derived: active voice, positive
+  form, concrete language, omit needless words, no filler openers, no fashionable words; multilingual,
+  English + Italian). It loads every session and is injected into every spawned subagent, so builder
+  and challenger both write under it.
+- **A one-line precedence guard** keeps style subordinate to the work: exact syntax, a canary token, a
+  verbatim quote, a required option-block, or any methodology invariant outranks a style rule.
+- **Verbatim = install-exactly, revisable later.** The block enters byte-for-byte; it stays revisable
+  like any rule, so the living-hypothesis safety net stays real.
+- **Core only — the full Strunk & White extraction was NOT shipped.** A reference layer in
+  `METHODOLOGY.md` was built, then dropped: no reader triggers it, and it concentrates copyright
+  exposure. The operative 21 rules meet the goal alone.
+- **Scope A (steer, not graded):** the challenger follows the rules but gains no prose-grading
+  dimension; Option B (enforcement) stays available if the steer proves weak.
+
+**Honest bar (T2).** Proven: the block + guard install, deploy, and inherit; a subagent probe confirms
+exact tokens survive the rules; a sample paragraph obeys them. NOT claimed: that prose objectively
+"got better" — that benefit is an accepted, unmeasured steer, watched by the operator over time, not
+auto-detected. The core grows ~24 lines, accepted as the operator's chosen load. Version 0.5.1 → 0.5.2.
+<!-- WF:need:c9887ef5:end -->
+
 <!-- WF:need:b86710c6:start -->
 **M7 — The harness stops overclaiming · Need settled (2026-07-17, task `b86710c6`).**
 Dogfooded in-repo through the live workflow; converged over **seven** adversarial challenge

@@ -5,6 +5,41 @@
 
 <!-- WF:anchor:decisions-log -->
 
+### 2026-07-21 — Writing-style rules in the always-on core
+
+**What changed.** Appended a 21-rule writing-style block (Strunk & White-derived — active voice,
+positive form, concrete language, omit needless words, no filler openers, no fashionable words;
+multilingual, English + Italian) plus a one-line precedence guard to `claude/CLAUDE.md`. The core
+loads every session and the harness injects it into every spawned subagent, so builder and challenger
+now both write under the rules. `VERSION` 0.5.1 → 0.5.2; `CHANGELOG` updated; operator rulings
+recorded in `OPERATOR.md`; new hazard `RISKS.md` #33.
+
+**Why the core, and why lean (R2).** The operator wanted the style applied "every session and every
+project, without forgetting the rest of the workflow." Only the always-on core reaches every agent —
+`METHODOLOGY.md` is on-demand and never injected into a subagent — so the operative rules had to live
+in the core. The core stays lean on purpose: a bloated always-on context steers *worse*, thinning
+attention on the six invariants, the exact thing the operator asked to protect.
+
+**Dropped — the reference layer.** A `METHODOLOGY.md` copy of the operator's full Strunk & White
+extraction was built during the workflow, then cut: nothing triggers a read of it (the main model will
+not open a five-part extraction; subagents never receive it), and it concentrates copyright exposure.
+The 21 rules meet the goal alone.
+
+**"Verbatim" = install-exactly, revisable later.** The operator's "copy verbatim" governs entry
+(byte-for-byte, no paraphrase), not permanence. The block stays revisable like any rule, which keeps
+the living-hypothesis net real — the round-2 challenge caught the earlier draft claiming both at once.
+
+**Honest bar (T2).** Installed, deployed, inherited; a subagent probe confirmed an exact token
+survives beside the style rules; a sample paragraph obeys them. The system does **not** claim prose
+objectively improved — that is an accepted, unmeasured steer the operator watches over time, not an
+auto-detected signal. Scope A: the challenger follows the rules but does not grade prose; Option B
+(enforcement) stays available if the steer proves weak.
+
+**Process.** Settled over three adversarial rounds, dogfooded in-repo. Round 1: the challenger was
+handed a summary, not the rules. Round 2: a verbatim-vs-revisable contradiction and an unstated global
+scope. Round 3: an overclaimed "ceiling" and a proof testing installation, not benefit. Each folded
+before shipping. Not committed — the commit is the operator's to approve.
+
 ### 2026-07-21 — `/start-task` chat command for the workflow bootstrap
 
 **What changed.** Added a human-owned **`/start-task "<goal>"`** slash command (a new user skill,

@@ -7,14 +7,14 @@ files that live in `~/.claude` (`%USERPROFILE%\.claude` on Windows, `$HOME/.clau
 It has **two halves**:
 
 1. **An always-on core** — six invariants + an OODA loop that hold on *every* project and machine,
-   so the agent asks before building, assumes nothing, documents the *why*, keeps docs in sync, and
-   proves its work.
+   so the agent asks before building, assumes nothing, documents the *why*, keeps docs in sync,
+   proves its work, and writes in a clear, plain, active style.
 2. **An opt-in six-step adversarial workflow** — machinery that makes those rules actually *run* on a
    task: a second AI (the *challenger*) attacks each step before it settles, a deterministic script
    gates progress on a real challenge, and the project's docs write themselves as you go.
 
 The only requirement is **Python 3** (already on most machines — nothing to `pip install`). Current
-version **0.5.0** — pre-1.0 on purpose: this is a *living hypothesis*, revised when a rule misfires.
+version **0.5.2** — pre-1.0 on purpose: this is a *living hypothesis*, revised when a rule misfires.
 
 ---
 

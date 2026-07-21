@@ -75,3 +75,13 @@ memory store exists. Getting the harness honest about exactly this is what M7 is
   builder **deriving** this from the bullet above instead of asking me — twice wrong about that same
   bullet first. This file exists to hold facts I've actually stated: when a design needs one, ask,
   and write the answer here.)*
+- **Writing style is methodology, and it belongs in the core — not a personal `~/.claude` tweak.**
+  *(Ruled 2026-07-21.)* The operator commissioned a 21-rule writing-style block and ruled it into the
+  always-on core, distinct from the personal-aesthetic tweaks (status line, `settings.json`) that stay
+  OUT of the methodology repo. Consequences: (1) "verbatim" for these rules means **install-exactly**
+  — byte-for-byte at entry — **not** frozen; they stay revisable like any rule. (2) He authored the
+  block for **English and Italian**, with the English-only mechanics scoped to its rule 21, so rules
+  1–18 are treated as language-general. (3) The full Strunk & White extraction is **not** shipped — he
+  accepted dropping it as dead weight plus copyright exposure, keeping only the operative 21 in the
+  core. *(Recorded because the task's own challenger flagged, correctly, that these calls lived only in
+  the builder's narration — the failure mode this file exists to kill.)*

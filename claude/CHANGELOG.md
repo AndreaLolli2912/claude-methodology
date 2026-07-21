@@ -5,6 +5,17 @@
 > the human-readable changelog. Each release is one `## <semver> — <date>` heading followed
 > by `- ` bullet lines. Newest first. Keep the heading grammar stable — a parser binds to it.
 
+## 0.5.2 — 2026-07-21
+- **Writing-style rules added to the always-on core.** A 21-rule block (Strunk & White-derived:
+  active voice, positive form, concrete language, omit needless words, no filler openers, no
+  fashionable words; multilingual — English + Italian) now ships in `CLAUDE.md`, so every session and
+  every spawned subagent writes under it — builder and challenger alike. A one-line precedence guard
+  keeps style subordinate to functional and workflow requirements (exact syntax, canary tokens,
+  verbatim quotes, required option-blocks, methodology invariants). Installed verbatim; revisable like
+  any rule. The full Strunk & White extraction was considered as a `METHODOLOGY.md` reference and
+  dropped (no reader path; copyright exposure). Settled through the workflow over three challenge
+  rounds; the benefit is an accepted, unmeasured steer, watched over time, not auto-detected.
+
 ## 0.5.1 — 2026-07-21
 - **`/start-task` — a chat command to start a workflow task.** A new user skill (`skills/start-task/`)
   is the human-owned bootstrap: type `/start-task "<goal>"` in Claude's chat and it scaffolds any missing

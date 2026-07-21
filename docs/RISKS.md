@@ -37,6 +37,7 @@
 | 30 | **The honest text's only live check is post-deploy and covers one repo** — cross-repo exposure is unobserved and imminent. Mid-session `MEMORY.md` edits don't reach subagents (a decoy re-probe needs a fresh session). | Medium | Accepted (M7) — no pre-ship close possible |
 | 31 | **Wrong-copy warning (R-4) deferred.** A task run from a non-deployed `workflow.py` copy is unwarned. | Low | Deferred — trimmed at M7 round 11 (defective mechanism) |
 | 32 | **Warm-source drift detection (R-2's dropped half) deferred.** `record` hashes the artifact but not warm sources. | Low | Deferred — trimmed at M7 round 11 (fires on the common edit path) |
+| 33 | **Writing-style rules are an unmeasured steer; methodology-dilution is watched, not detected.** 21 always-on rules cost some attention on the six invariants beside them; the erosion would be gradual and silent (each output looks locally fine), and no automated signal catches it. | Low–Medium | Accepted (2026-07-21) — the honest bar: the operator watches adherence over time and tightens or cuts a rule if one misfires (revisable by design); the core was kept lean precisely to bound this |
 
 ## Detail
 

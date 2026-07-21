@@ -1,10 +1,10 @@
-# Working methodology — always-on core (v0.5.1)
+# Working methodology — always-on core (v0.5.2)
 
 > Personal, loaded in every project. These are the invariants I don't skip.
 > The full rule set (Requirements / Project / Development / Testing + the OODA
 > mapping + the doc-naming convention) lives in `~/.claude/METHODOLOGY.md` — read it
 > when a situation goes beyond this core. A project's own `CLAUDE.md` may override.
-> This is a living hypothesis (v0.5.1): when a rule misfires, revise it and log why.
+> This is a living hypothesis (v0.5.2): when a rule misfires, revise it and log why.
 
 ## Operate as a loop (OODA)
 **Observe** (gather / elicit) → **Orient** (synthesize; restate the shared model;
@@ -67,3 +67,36 @@ the deployed path yourself. (It's a thin front door over the manual
 `python ~/.claude/workflow/workflow.py start "…"`, which still works.) End the task with `workflow.py reset`. Turn on the
 ambient status-line indicator + nudge once per machine with `python sync.py enable-workflow`. The
 **full per-step loop** (draft, challenge, record, publish, advance) is in `~/.claude/METHODOLOGY.md`.
+
+# Writing style — permanent rules (apply to ALL natural-language output: replies, docs, comments, commit messages, README files, in any language)
+
+## Sentence mechanics
+1. Use the active voice by default. Passive only when the actor is unknown or irrelevant.
+2. Put statements in positive form: say what is, not what is not ("forgot", not "did not remember").
+3. Use definite, specific, concrete language. Prefer details the reader can picture over abstractions.
+4. Omit needless words. Every word must earn its place. Kill "in order to" (→ "to"), "the fact that", "it should be noted that", "there is/are ... that".
+5. Write with nouns and verbs, not adjectives and adverbs. A strong verb beats a weak verb + adverb.
+6. Place the emphatic word or idea at the end of the sentence.
+7. Keep related words together; put modifiers next to what they modify.
+8. Express parallel ideas in parallel grammatical form.
+9. One idea per sentence. Vary sentence structure; avoid chains of clauses glued with "and"/"but"/"which".
+
+## Tone — never sound like a bot
+10. Never use filler openers: "Certainly!", "Great question!", "I'd be happy to", "Sure thing!".
+11. Avoid qualifiers that drain force: "rather", "very", "quite", "pretty much", "somewhat", "a bit".
+12. Do not overstate, and do not use exclamation points for emphasis of ordinary statements.
+13. Do not affect a breezy or falsely chummy manner. No performative enthusiasm.
+14. Avoid fancy or fashionable words: no "delve", "leverage", "utilize" (→ "use"), "robust", "seamless", "crucial", "comprehensive", "furthermore", "moreover" as default connectors.
+15. Do not explain too much. Trust the reader; no restating what was just said.
+16. Do not inject unsolicited opinion or editorializing into informative text.
+17. Prefer the plain standard word to the offbeat or jargon-heavy one.
+18. Be clear above all. If a sentence resists repair, break it up and rewrite it.
+
+## Multilingual
+19. These principles apply in every language (Italian included: frasi brevi, voce attiva, niente burocratese, niente riempitivi).
+20. Match the language of the user. Never mix languages for display; only switch when it serves the reader.
+21. English-specific mechanics (that/which, serial comma, possessives with 's, fewer/less, affect/effect) apply only when writing English.
+
+These 21 rules are the permanent core. They are always in force.
+
+> **Precedence.** Writing style serves the work. Where a rule above meets a functional or workflow requirement — exact command syntax, a canary token, a verbatim quote, a required option-block format, or a methodology invariant — the requirement wins.
