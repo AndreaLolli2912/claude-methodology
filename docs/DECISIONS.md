@@ -5,6 +5,25 @@
 
 <!-- WF:anchor:decisions-log -->
 
+### 2026-07-21 — README rewritten as a self-contained guide (consumers + developers)
+
+**What changed.** Rewrote the root `README.md` (193 → ~375 lines) into a fully self-contained document:
+why / what / how, both command sets (`sync.py` + `workflow.py`), an architecture overview with **two
+Mermaid diagrams** (the deploy/transport flow + the six-step loop), the **full 32-risk register inline**,
+the roadmap, and a complete **developer** half. Three operator shape-decisions (R2): **fully
+self-contained** (accepting the `docs/`-duplication + sync cost over a lean link-map), **Mermaid**
+diagrams (GitHub-rendered; angle-bracket labels avoided so HTML-label mode doesn't drop them), and the
+**full weak-points list inline**. Preserved the prior setup / commands / Windows-Store content.
+
+**Also (P2).** Completed the `RISKS.md` summary table — it stopped at #26 while its Detail section
+carried #27–#32, a self-inconsistency I introduced at M7 Shipping (the exact "same claim out of sync
+across a doc" class M7 removes). **Flagged, not fixed:** `docs/WORKFLOW.md` is stale (status header
+2026-07-15; still describes M7 as the *planned* milestone, not the trimmed honesty one that shipped) — a
+larger follow-up.
+
+**Note.** `README.md` + `docs/` are repo docs, not the `claude/` payload — committed, not deployed.
+Further README refinements expected (operator).
+
 ### 2026-07-21 — M7 Shipping built: the honest harness ships (0.5.0); deploy is the terminal action
 
 **What's built (Shipping's hand-written half — no auto-doc).** Settled over **two Shipping challenge
