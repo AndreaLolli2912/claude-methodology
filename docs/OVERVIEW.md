@@ -31,7 +31,7 @@ every machine in sync through git.
 | 2 | Git-based sync as the primary multi-machine flow (clone → pull → install; capture → commit → push) | In use; may automate |
 | 3 | Cross-platform support — one `sync.py` runs install & capture on Windows/macOS/Linux | Done |
 | 4 | Grow the bundle (more skills/agents) as the methodology matures | In progress (bundle ships `agents/`, `hooks/`, `workflow/` alongside `skills/` since v0.4.0) |
-| 5 | Active adversarial workflow (six steps + a challenger) that makes the rules *run* | Building — **M1–M6 complete**: the workflow is built, **deployed (v0.4.0)**, and **fires on its own** (workflow-aware status line + nudge + the D-2 rooting fix, live in `~/.claude`); M6 shipped the directory-whitelist transport. **M7 (harness honesty) — Implementation done + Judgment settled GO** (2026-07-21, through 4 Judgment rounds; the harness caught its own verdict overclaiming — see DECISIONS); **Shipping next** (hand-write RISKS/PLAYBOOK/CHANGELOG, bump VERSION, `reset` + `install` to lift the 0.4.0 pin). Later milestones remain (`docs/WORKFLOW.md`) |
+| 5 | Active adversarial workflow (six steps + a challenger) that makes the rules *run* | Building — **M1–M7 complete**: the workflow is built, **deployed (v0.5.0)**, and **fires on its own** (workflow-aware status line + nudge + the D-2 rooting fix, live in `~/.claude`); M6 shipped the directory-whitelist transport; **M7 (harness honesty) shipped 2026-07-21** — the challenger-facing text stops overclaiming (the honest text is now live in `~/.claude`), `global_habits` retired, `context_hash` removed, settled over a **4-round Judgment that caught its *own* verdict overclaiming its evidence** (see DECISIONS). Later milestones remain (`docs/WORKFLOW.md`) |
 
 ## Current status
 

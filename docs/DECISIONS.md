@@ -37,6 +37,14 @@ re-`install`. Then the **live-after-close** check (owner: operator, first post-`
 re-probe needs a fresh session). Committed as a checkpoint **before** the deploy so the rollback has a clean
 commit to return to.
 
+**Deployed (2026-07-21, verified).** `reset` cleared the task; `sync.py install` shipped 13 files (13
+backed up as `*.20260721-124549.bak`, 1 junk skipped, 0 missing). Verified live: the deployed
+`rulebook.md`/`challenger.md` now carry the honest block (the old over-claims are grep-absent),
+`workflow.py` has no `context_hash`/`global_habits`, and `~/.claude/VERSION` is `0.5.0`. **The 0.4.0 pin is
+lifted; M7 is complete.** Still owed (owner: operator): the live-after-close check on the first post-`reset`
+task — `prepare`/`record` behave with no `context_hash`, the `global_habits` retire holds, and a
+fresh-session decoy re-probe. A Claude Code restart picks up the new core.
+
 ### 2026-07-21 — M7 Judgment settled: GO on honest ground (four rounds; the harness caught itself)
 
 **What settled.** M7-as-implemented meets its trimmed Need — **GO**. Settled over **four adversarial
